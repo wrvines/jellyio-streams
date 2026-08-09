@@ -232,7 +232,10 @@ public class AIOStreamsController : ControllerBase
     [HttpGet("Status")]
     public ActionResult<SyncStatus> GetStatusAsync()
     {
-        return Ok(_synchronizer.GetStatus());
+        var status = _synchronizer.GetStatus();
+        status.PluginVersion = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString();
+        status.AddonUrlConfigured = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.AddonUrl);
+        return Ok(status);
     }
 
     private (string AddonUrl, string? ExtraQuery) RequireConnection()
@@ -242,7 +245,10 @@ public class AIOStreamsController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(config.AddonUrl))
         {
-            throw new InvalidOperationException("The AIOStreams addon URL is not configured. Open the plugin settings first.");
+            var version = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString() ?? "unknown";
+            throw new InvalidOperationException(
+                "The AIOStreams addon URL is not configured (plugin " + version + "). "
+                + "Open the plugin settings, enter the URL, and press Save before using Test connection.");
         }
 
         return (config.AddonUrl.Trim(), string.IsNullOrWhiteSpace(config.ExtraQuery) ? null : config.ExtraQuery.Trim());

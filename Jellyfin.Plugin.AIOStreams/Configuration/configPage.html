@@ -36,7 +36,7 @@
             <div class="jellyio-field">
                 <label for="AddonUrl">AIOStreams addon URL</label>
                 <input type="text" id="AddonUrl" class="fldAddonUrl" placeholder="https://stream.example.com/stremio/&lt;uuid&gt;/&lt;token&gt;" />
-                <div class="jellyio-hint">Your AIOStreams install URL from the addon's "Save &amp; Install" page. A trailing /manifest.json is also accepted.</div>
+                <div class="jellyio-hint">Your AIOStreams install URL from the addon's "Save &amp; Install" page. A trailing /manifest.json is also accepted. "Test connection" saves the URL before testing, so it cannot be missed.</div>
             </div>
             <div class="jellyio-field">
                 <label for="ExtraQuery">Extra query parameters</label>
@@ -252,62 +252,88 @@
                     return config;
                 };
 
-                Controller.prototype.save = function () {
+                Controller.prototype.save = function (silent) {
                     var self = this;
-                    if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
+                    if (!window.ApiClient) {
+                        this.showError("ApiClient is not available in this page.");
+                        return Promise.reject();
+                    }
 
                     var config = this.readForm();
 
                     // Never let a failed load turn Save into a wipe of the stored settings.
                     if (!this.loadedConfig && !config.AddonUrl) {
                         this.showError("The current configuration could not be read, so saving empty settings is blocked. Reload the page, or enter the addon URL before saving.");
-                        return;
+                        return Promise.reject();
                     }
 
                     this.setText(".saveMessage", "Saving…");
                     loading(true);
 
-                    ApiClient.updatePluginConfiguration(PLUGIN_ID, config).then(function () {
-                        return self.verifySave(config);
+                    return ApiClient.updatePluginConfiguration(PLUGIN_ID, config).then(function () {
+                        return self.verifySave(config, silent);
                     }).catch(function (err) {
-                        // A 204 No Content is the documented success response; some clients reject
-                        // it while trying to parse an empty body.
-                        if (err && err.status === 204) { return self.verifySave(config); }
+                        // The 204 No Content success response can reach here as a raw Response on
+                        // some clients; treat it as success.
+                        if (err && err.status === 204) { return self.verifySave(config, silent); }
                         loading(false);
                         self.setText(".saveMessage", "");
                         self.showHttpError("Save failed:", err);
+                        throw err;
                     });
                 };
 
                 // Re-read the configuration so the page reports what the server actually stored
                 // instead of assuming the POST took effect.
-                Controller.prototype.verifySave = function (sent) {
+                Controller.prototype.verifySave = function (sent, silent) {
                     var self = this;
                     return ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
                         loading(false);
                         self.loadedConfig = config;
 
                         var stored = pick(config, "AddonUrl") || "";
-                        if (stored === sent.AddonUrl) {
+                        if (stored !== sent.AddonUrl) {
+                            self.setText(".saveMessage", "");
+                            self.showError("The server did not store the addon URL (it now reports \""
+                                + maskUrl(stored) + "\"). Check the Jellyfin logs for a plugin configuration error.");
+                            throw new Error("Config did not persist.");
+                        }
+
+                        if (!silent) {
                             self.setText(".saveMessage", sent.AddonUrl
                                 ? "Saved. Addon URL: " + maskUrl(stored)
                                 : "Saved.");
-                            self.refreshStatus();
                             setTimeout(function () { self.setText(".saveMessage", ""); }, 5000);
-                            return;
                         }
-
-                        self.setText(".saveMessage", "");
-                        self.showError("The server did not store the addon URL (it now reports \""
-                            + maskUrl(stored) + "\"). Check the Jellyfin logs for a plugin configuration error.");
+                        self.refreshStatus();
                     }).catch(function (err) {
                         loading(false);
-                        self.setText(".saveMessage", "Saved (could not verify).");
-                        self.showHttpError("Verification failed:", err);
+                        if (!err || err.message !== "Config did not persist.") {
+                            self.setText(".saveMessage", "");
+                            self.showHttpError("Verification failed:", err);
+                        }
+                        throw err;
                     });
                 };
 
                 Controller.prototype.testConnection = function () {
+                    var self = this;
+                    var current = this.el(".fldAddonUrl").value.trim();
+                    var stored = pick(this.loadedConfig, "AddonUrl") || "";
+
+                    // The 400 "addon URL is not configured" almost always means the URL was typed
+                    // but never saved. Persist it before testing so the button can't miss.
+                    if (current && current !== stored) {
+                        this.setText(".connectionResult", "Saving the addon URL first…");
+                        this.save(true).then(function () {
+                            self.doTestConnection();
+                        }).catch(function () { /* save reported its own error */ });
+                        return;
+                    }
+                    this.doTestConnection();
+                };
+
+                Controller.prototype.doTestConnection = function () {
                     var self = this;
                     if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
 
@@ -352,11 +378,15 @@
                 Controller.prototype.refreshStatus = function () {
                     var self = this;
                     ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
+                        var version = pick(status, "PluginVersion");
+                        var configured = pick(status, "AddonUrlConfigured");
+                        var configLine = "Server: plugin " + (version || "?") + " · addon URL " +
+                            (configured ? "configured" : "NOT configured");
                         var last = pick(status, "LastResult");
                         if (pick(status, "IsSyncing")) {
-                            self.setText(".statusBox", "A sync is currently running…");
+                            self.setText(".statusBox", "A sync is currently running…\n" + configLine);
                         } else if (pick(status, "LastError")) {
-                            self.setText(".statusBox", "Last run failed: " + pick(status, "LastError"));
+                            self.setText(".statusBox", "Last run failed: " + pick(status, "LastError") + "\n" + configLine);
                         } else if (last) {
                             self.setText(".statusBox", "Last run: " + [
                                 pick(last, "Movies") + " movies",
@@ -365,9 +395,9 @@
                                 pick(last, "Streams") + " streams",
                                 pick(last, "Files") + " files",
                                 pick(last, "Skipped") + " skipped"
-                            ].join(", ") + ".");
+                            ].join(", ") + ".\n" + configLine);
                         } else {
-                            self.setText(".statusBox", "No sync has run yet. Configure the addon URL, then press \"Sync now\".");
+                            self.setText(".statusBox", "No sync has run yet. Configure the addon URL, then press \"Sync now\".\n" + configLine);
                         }
                     }).catch(function (err) {
                         self.showHttpError("Failed to read status:", err);

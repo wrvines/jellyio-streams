@@ -55,6 +55,16 @@ public sealed class SyncStatus
     public string? LastError { get; set; }
 
     public SyncResult? LastResult { get; set; }
+
+    /// <summary>
+    /// Gets or sets the running plugin version (diagnostics).
+    /// </summary>
+    public string? PluginVersion { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the server has an addon URL configured.
+    /// </summary>
+    public bool AddonUrlConfigured { get; set; }
 }
 
 /// <summary>
