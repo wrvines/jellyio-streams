@@ -140,6 +140,26 @@
                     try { console.error(message); } catch (e) { }
                 },
 
+                // Turns an ApiClient rejection (a fetch Response on HTTP errors) into a readable message.
+                showHttpError: function (context, err) {
+                    if (err && typeof err.status === 'number') {
+                        var self = this;
+                        var base = context + " HTTP " + err.status + (err.url ? " (" + err.url + ")" : "");
+                        if (typeof err.text === 'function') {
+                            err.text().then(function (body) {
+                                var detail = body ? " - " + body.slice(0, 400) : "";
+                                self.showError(base + detail);
+                            }).catch(function () {
+                                self.showError(base);
+                            });
+                        } else {
+                            self.showError(base);
+                        }
+                        return;
+                    }
+                    this.showError(context + (err && err.message ? err.message : err));
+                },
+
                 load: function () {
                     if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
                     try {
@@ -159,10 +179,10 @@
                             if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
                         }).catch(function (err) {
                             if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                            JellyioConfig.showError("Failed to load plugin config: " + (err && err.message ? err.message : err));
+                            JellyioConfig.showHttpError("Failed to load plugin config:", err);
                         });
                     } catch (err) {
-                        JellyioConfig.showError("Failed to load plugin config: " + (err && err.message ? err.message : err));
+                        JellyioConfig.showHttpError("Failed to load plugin config:", err);
                     }
                 },
 
@@ -190,7 +210,7 @@
                         msg.textContent = "Saved.";
                         setTimeout(function () { msg.textContent = ""; }, 3000);
                     }).catch(function (err) {
-                        JellyioConfig.showError("Save failed: " + (err && err.message ? err.message : err));
+                        JellyioConfig.showHttpError("Save failed:", err);
                     });
                 },
 
@@ -208,10 +228,10 @@
                                 (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)");
                         }).catch(function (err) {
                             if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                            JellyioConfig.showError("Connection failed: " + (err && err.message ? err.message : err));
+                            JellyioConfig.showHttpError("Connection failed:", err);
                         });
                     } catch (err) {
-                        JellyioConfig.showError("Connection failed: " + (err && err.message ? err.message : err));
+                        JellyioConfig.showHttpError("Connection failed:", err);
                     }
                 },
 
@@ -226,8 +246,7 @@
                         JellyioConfig.renderResult(document.getElementById('syncResult'), result);
                     }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
-                        document.getElementById('syncResult').textContent =
-                            "Sync failed: " + (err && err.message ? err.message : err);
+                        JellyioConfig.showHttpError("Sync failed:", err);
                     });
                 },
 
@@ -293,8 +312,7 @@
                         });
                     }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
-                        document.getElementById('searchResults').textContent =
-                            "Search failed: " + (err && err.message ? err.message : err);
+                        JellyioConfig.showHttpError("Search failed:", err);
                     });
                 },
 
@@ -324,8 +342,7 @@
                         btn.textContent = "Done";
                     }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
-                        document.getElementById('syncResult').textContent =
-                            "Add failed: " + (err && err.message ? err.message : err);
+                        JellyioConfig.showHttpError("Add failed:", err);
                     });
                 },
 

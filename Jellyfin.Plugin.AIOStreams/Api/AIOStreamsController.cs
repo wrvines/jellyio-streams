@@ -69,14 +69,21 @@ public class AIOStreamsController : ControllerBase
     [HttpGet("Manifest")]
     public async Task<ActionResult<AddonManifest>> GetManifestAsync(CancellationToken cancellationToken)
     {
-        var (addonUrl, extraQuery) = RequireConnection();
-        var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
-        if (manifest is null)
+        try
         {
-            return BadRequest("Could not fetch the AIOStreams manifest. Check the addon URL.");
-        }
+            var (addonUrl, extraQuery) = RequireConnection();
+            var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
+            if (manifest is null)
+            {
+                return BadRequest("Could not fetch the AIOStreams manifest. Check the addon URL.");
+            }
 
-        return Ok(manifest);
+            return Ok(manifest);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     /// <summary>
@@ -89,7 +96,9 @@ public class AIOStreamsController : ControllerBase
         [FromQuery] int limit = 20,
         CancellationToken cancellationToken = default)
     {
-        var (addonUrl, extraQuery) = RequireConnection();
+        try
+        {
+            var (addonUrl, extraQuery) = RequireConnection();
 
         if (string.IsNullOrWhiteSpace(term))
         {
@@ -127,6 +136,11 @@ public class AIOStreamsController : ControllerBase
             .ToList();
 
         return Ok(results);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     /// <summary>
@@ -138,25 +152,32 @@ public class AIOStreamsController : ControllerBase
         [FromQuery, Microsoft.AspNetCore.Mvc.ModelBinding.BindRequired] string id,
         CancellationToken cancellationToken = default)
     {
-        var (addonUrl, extraQuery) = RequireConnection();
+        try
+        {
+            var (addonUrl, extraQuery) = RequireConnection();
 
-        var response = await _client.GetStreamsAsync(addonUrl, extraQuery, type, id, cancellationToken).ConfigureAwait(false);
+            var response = await _client.GetStreamsAsync(addonUrl, extraQuery, type, id, cancellationToken).ConfigureAwait(false);
 
-        var streams = (response?.Streams ?? [])
-            .Where(s => !string.IsNullOrWhiteSpace(s.Url))
-            .Select((s, i) => new ApiStream
-            {
-                Url = s.Url,
-                Label = s.Title ?? s.Name ?? $"Stream {i + 1}",
-                Title = s.Title,
-                Name = s.Name,
-                Description = s.Description,
-                FileIdx = s.FileIdx,
-                NotWebReady = s.BehaviorHints?.NotWebReady
-            })
-            .ToList();
+            var streams = (response?.Streams ?? [])
+                .Where(s => !string.IsNullOrWhiteSpace(s.Url))
+                .Select((s, i) => new ApiStream
+                {
+                    Url = s.Url,
+                    Label = s.Title ?? s.Name ?? $"Stream {i + 1}",
+                    Title = s.Title,
+                    Name = s.Name,
+                    Description = s.Description,
+                    FileIdx = s.FileIdx,
+                    NotWebReady = s.BehaviorHints?.NotWebReady
+                })
+                .ToList();
 
-        return Ok(streams);
+            return Ok(streams);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     /// <summary>
