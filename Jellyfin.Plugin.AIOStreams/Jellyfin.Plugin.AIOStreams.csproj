@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.AIOStreams</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.AIOStreams</AssemblyName>
-    <Version>1.0.2.7</Version>
+    <Version>1.0.3.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDynamicLoading>true</EnableDynamicLoading>
@@ -14,6 +14,8 @@
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <None Remove="Web\searchPage.html" />
+    <EmbeddedResource Include="Web\searchPage.html" />
   </ItemGroup>
 
   <ItemGroup>

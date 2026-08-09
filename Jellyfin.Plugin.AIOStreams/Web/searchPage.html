@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jellyio Streams</title>
+    <style>
+        body { background: transparent; }
+        .jellyio-section { margin: 1.6em 0 0.5em; font-weight: 700; font-size: 1.1em; }
+        .jellyio-serverline { color: #999; font-size: 0.92em; margin-top: 0.3em; }
+        .jellyio-field { margin: 0.8em 0; }
+        .jellyio-field label { display: block; margin-bottom: 0.25em; font-weight: 600; }
+        .jellyio-field input[type="text"],
+        .jellyio-field select {
+            width: 100%; max-width: 36em; padding: 0.4em 0.6em;
+            border: 1px solid #555; border-radius: 4px; background: #151515; color: #ddd;
+        }
+        .jellyio-hint { color: #999; font-size: 0.9em; margin-top: 0.2em; }
+        .jellyio-actions button, .jellyio-card button { margin: 0.3em 0.6em 0.3em 0; padding: 0.5em 1.1em; cursor: pointer; }
+        .jellyio-searchrow { display: flex; flex-wrap: wrap; gap: 0.6em; align-items: flex-end; }
+        .jellyio-searchrow .jellyio-field { margin: 0; }
+        .jellyio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11em, 1fr)); gap: 1em; margin-top: 1em; }
+        .jellyio-card { border: 1px solid #333; border-radius: 6px; overflow: hidden; background: #101010; display: flex; flex-direction: column; }
+        .jellyio-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #1c1c1c; }
+        .jellyio-cardBody { padding: 0.5em 0.6em 0.6em; display: flex; flex-direction: column; gap: 0.3em; flex: 1; }
+        .jellyio-cardBody strong { font-size: 0.95em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .jellyio-cardBody span { color: #999; font-size: 0.85em; }
+        .jellyio-cardBody button { margin: auto 0 0; width: 100%; }
+        .jellyio-added { color: #7fba7f; font-size: 0.9em; padding: 0.3em 0; }
+        .jellyio-msg { color: #bbb; font-size: 0.92em; margin-top: 0.6em; white-space: pre-wrap; }
+        .jellyio-error { color: #e08c8c; font-size: 0.92em; margin-top: 0.6em; white-space: pre-wrap; }
+        .jellyio-librarylist { margin-top: 0.6em; }
+        .jellyio-librarylist div { padding: 0.25em 0; border-bottom: 1px solid #222; }
+        .jellyio-librarylist span { color: #999; }
+    </style>
+</head>
+<body>
+    <div id="JellyioSearchPage" data-role="page" class="page type-interior JellyioSearchPage">
+        <div class="content-primary" style="max-width:70em; padding:1em;">
+            <h1 style="margin:0;">Jellyio Streams</h1>
+            <div class="jellyio-serverline" id="serverLine"></div>
+
+            <div class="jellyio-section">Find a title</div>
+            <div class="jellyio-searchrow">
+                <div class="jellyio-field">
+                    <label>Type</label>
+                    <select class="fldSearchType">
+                        <option value="movie">Movie</option>
+                        <option value="series">Series</option>
+                    </select>
+                </div>
+                <div class="jellyio-field" style="flex:1 1 20em;">
+                    <label>Search AIOStreams</label>
+                    <input type="text" class="fldSearchTerm" placeholder="e.g. Dune" />
+                </div>
+                <button type="button" class="btnSearch" style="padding:0.5em 1.1em; cursor:pointer;">Search</button>
+            </div>
+            <div class="jellyio-msg" id="searchMsg"></div>
+            <div class="jellyio-grid" id="searchResults"></div>
+
+            <div class="jellyio-section">In your library</div>
+            <div class="jellyio-actions">
+                <button type="button" class="btnRefresh" style="padding:0.5em 1.1em; cursor:pointer;">Refresh</button>
+            </div>
+            <div class="jellyio-msg" id="libraryBox"></div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var PLUGIN_ID = "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b";
+                var PAGE_SELECTOR = ".JellyioSearchPage";
+
+                function currentPage() {
+                    var own = document.currentScript;
+                    var scoped = own && own.closest ? own.closest(PAGE_SELECTOR) : null;
+                    if (scoped) { return scoped; }
+                    var all = document.querySelectorAll(PAGE_SELECTOR);
+                    return all.length ? all[all.length - 1] : null;
+                }
+
+                function pick(obj, name) {
+                    if (!obj || typeof obj !== "object") { return undefined; }
+                    if (Object.prototype.hasOwnProperty.call(obj, name)) { return obj[name]; }
+                    var lower = String(name).toLowerCase();
+                    for (var key in obj) {
+                        if (Object.prototype.hasOwnProperty.call(obj, key) && key.toLowerCase() === lower) {
+                            return obj[key];
+                        }
+                    }
+                    return undefined;
+                }
+
+                function escapeHtml(value) {
+                    return String(value == null ? "" : value)
+                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+                }
+
+                function loading(show) {
+                    if (!window.Dashboard) { return; }
+                    if (show && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
+                    if (!show && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                }
+
+                function Controller(page) {
+                    this.page = page;
+                    this.added = {};
+                }
+
+                Controller.prototype.el = function (selector) {
+                    return this.page.querySelector(selector);
+                };
+
+                Controller.prototype.setText = function (selector, text) {
+                    var el = this.el(selector);
+                    if (el) { el.textContent = text; }
+                };
+
+                Controller.prototype.showError = function (message) {
+                    this.setText("#searchMsg", "ERROR: " + message);
+                    try { console.error("[Jellyio Streams] " + message); } catch (e) { /* ignore */ }
+                };
+
+                Controller.prototype.showHttpError = function (context, err) {
+                    var self = this;
+                    if (err && typeof err.status === "number") {
+                        var base = context + " HTTP " + err.status + (err.url ? " (" + err.url + ")" : "");
+                        if (typeof err.text === "function") {
+                            err.text().then(function (body) {
+                                self.showError(base + (body ? " - " + body.slice(0, 400) : ""));
+                            }).catch(function () { self.showError(base); });
+                        } else {
+                            self.showError(base);
+                        }
+                        return;
+                    }
+                    this.showError(context + " " + (err && err.message ? err.message : err));
+                };
+
+                Controller.prototype.serverLine = function () {
+                    var self = this;
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
+                        var configured = pick(status, "AddonUrlConfigured");
+                        var version = pick(status, "PluginVersion");
+                        var line = "Server: plugin " + (version || "?") + " · addon URL " +
+                            (configured ? "configured" : "NOT configured");
+                        if (!configured) {
+                            line += " — open the plugin settings and enter your AIOStreams URL first.";
+                            self.el("#serverLine").innerHTML = escapeHtml(line) +
+                                ' <a href="configurationpage?name=' + encodeURIComponent("Jellyio Streams") + '">Settings</a>';
+                            return;
+                        }
+                        self.setText("#serverLine", line);
+                    }).catch(function (err) {
+                        self.showHttpError("Failed to read status:", err);
+                    });
+                };
+
+                Controller.prototype.search = function () {
+                    var self = this;
+                    var term = this.el(".fldSearchTerm").value.trim();
+                    var type = this.el(".fldSearchType").value;
+                    if (!term) { return; }
+
+                    this.setText("#searchMsg", "Searching…");
+                    this.el("#searchResults").innerHTML = "";
+                    loading(true);
+
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Search", { term: term, type: type, limit: 24 })).then(function (results) {
+                        loading(false);
+                        var container = self.el("#searchResults");
+                        var list = results || [];
+
+                        if (list.length === 0) {
+                            self.setText("#searchMsg", "No results for \"" + term + "\".");
+                            return;
+                        }
+
+                        self.setText("#searchMsg", list.length + " result(s) for \"" + term + "\".");
+                        container.innerHTML = list.map(function (item) {
+                            var id = pick(item, "Id");
+                            var name = pick(item, "Name");
+                            var poster = pick(item, "Poster");
+                            var release = pick(item, "ReleaseInfo") || "";
+                            var already = self.added[id];
+                            var button = already
+                                ? '<div class="jellyio-added">Added</div>'
+                                : '<button type="button" data-id="' + escapeHtml(id) +
+                                    '" data-name="' + escapeHtml(name) +
+                                    '" data-type="' + escapeHtml(pick(item, "Type") || type) +
+                                    '" data-release="' + escapeHtml(release) + '">Add</button>';
+                            return '<div class="jellyio-card">' +
+                                (poster ? '<img src="' + escapeHtml(poster) + '" loading="lazy" />' : "") +
+                                '<div class="jellyio-cardBody">' +
+                                "<strong>" + escapeHtml(name) + "</strong>" +
+                                "<span>" + escapeHtml(release || type) + "</span>" +
+                                button +
+                                "</div></div>";
+                        }).join("");
+
+                        container.querySelectorAll("button[data-id]").forEach(function (btn) {
+                            btn.addEventListener("click", function () { self.add(btn); });
+                        });
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Search failed:", err);
+                    });
+                };
+
+                Controller.prototype.add = function (btn) {
+                    var self = this;
+                    var id = btn.getAttribute("data-id");
+                    btn.disabled = true;
+                    btn.textContent = "Adding…";
+                    loading(true);
+
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/Add"),
+                        data: JSON.stringify({
+                            type: btn.getAttribute("data-type") || "movie",
+                            id: id,
+                            name: btn.getAttribute("data-name"),
+                            releaseInfo: btn.getAttribute("data-release")
+                        }),
+                        contentType: "application/json",
+                        dataType: "json"
+                    }).then(function (result) {
+                        loading(false);
+                        self.added[id] = true;
+                        btn.disabled = false;
+                        btn.textContent = "Added";
+                        btn.setAttribute("disabled", "disabled");
+                        var text = [
+                            pick(result, "Movies") + " movies",
+                            pick(result, "Shows") + " shows",
+                            pick(result, "Episodes") + " episodes",
+                            pick(result, "Streams") + " streams",
+                            pick(result, "Files") + " files"
+                        ].join(", ") + " added to your library. Jellyfin is scanning it now.";
+                        self.setText("#searchMsg", "Added: " + text);
+                        self.library();
+                    }).catch(function (err) {
+                        loading(false);
+                        btn.disabled = false;
+                        btn.textContent = "Add";
+                        self.showHttpError("Add failed:", err);
+                    });
+                };
+
+                Controller.prototype.library = function () {
+                    var self = this;
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Library")).then(function (data) {
+                        var movies = pick(data, "Movies") || [];
+                        var shows = pick(data, "Shows") || [];
+                        var root = pick(data, "RootPath") || "";
+                        var box = self.el("#libraryBox");
+
+                        if (movies.length === 0 && shows.length === 0) {
+                            box.innerHTML = '<div class="jellyio-hint">Nothing in the library yet — search above and press Add.</div>';
+                            return;
+                        }
+
+                        var html = '<div class="jellyio-librarylist">';
+                        if (movies.length > 0) {
+                            html += "<div><strong>Movies</strong></div>";
+                            movies.forEach(function (m) {
+                                html += "<div>" + escapeHtml(pick(m, "Name")) + ' <span>' + escapeHtml(pick(m, "Year") || "") + "</span></div>";
+                            });
+                        }
+                        if (shows.length > 0) {
+                            html += "<div><strong>Shows</strong></div>";
+                            shows.forEach(function (s) {
+                                html += "<div>" + escapeHtml(pick(s, "Name")) + ' <span>' + escapeHtml(pick(s, "Year") || "") + "</span></div>";
+                            });
+                        }
+                        html += "</div>";
+                        if (root) { html += '<div class="jellyio-hint">Library folder: ' + escapeHtml(root) + "</div>"; }
+                        box.innerHTML = html;
+                    }).catch(function (err) {
+                        self.showHttpError("Failed to read the library:", err);
+                    });
+                };
+
+                Controller.prototype.bind = function () {
+                    var self = this;
+                    this.el(".btnSearch").addEventListener("click", function () { self.search(); });
+                    this.el(".btnRefresh").addEventListener("click", function () { self.library(); });
+                    this.el(".fldSearchTerm").addEventListener("keypress", function (e) {
+                        if (e.key === "Enter") { self.search(); }
+                    });
+                };
+
+                function init(page) {
+                    if (!page || page.getAttribute("data-jellyio-init") === "1") { return; }
+                    page.setAttribute("data-jellyio-init", "1");
+
+                    var controller = new Controller(page);
+                    controller.bind();
+                    controller.serverLine();
+                    controller.library();
+                }
+
+                init(currentPage());
+                document.addEventListener("pageshow", function (e) {
+                    var target = e.target;
+                    if (target && target.classList && target.classList.contains("JellyioSearchPage")) {
+                        init(target);
+                    } else {
+                        init(currentPage());
+                    }
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

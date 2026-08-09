@@ -58,6 +58,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 Name = "Jellyio Streams",
                 EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
+            },
+            new PluginPageInfo
+            {
+                Name = "JellyioStreamsSearch",
+                DisplayName = "Jellyio Streams",
+                EmbeddedResourcePath = GetType().Namespace + ".Web.searchPage.html",
+                EnableInMainMenu = true
             }
         };
     }

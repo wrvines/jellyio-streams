@@ -42,6 +42,30 @@ public sealed class AddTitleRequest
 }
 
 /// <summary>
+/// A title currently on disk in the managed library folder.
+/// </summary>
+public sealed class LibraryTitle
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string? Year { get; set; }
+
+    public string Type { get; set; } = "movie";
+}
+
+/// <summary>
+/// The managed library folder contents.
+/// </summary>
+public sealed class LibraryListing
+{
+    public string RootPath { get; set; } = string.Empty;
+
+    public IReadOnlyList<LibraryTitle> Movies { get; set; } = [];
+
+    public IReadOnlyList<LibraryTitle> Shows { get; set; } = [];
+}
+
+/// <summary>
 /// REST endpoints for the plugin (manifest info, search, stream listing, add/sync/status).
 /// </summary>
 [ApiController]
@@ -236,6 +260,57 @@ public class AIOStreamsController : ControllerBase
         status.PluginVersion = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString();
         status.AddonUrlConfigured = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.AddonUrl);
         return Ok(status);
+    }
+
+    /// <summary>
+    /// Lists the titles currently on disk in the managed library folder.
+    /// </summary>
+    [HttpGet("Library")]
+    public ActionResult<LibraryListing> GetLibraryAsync()
+    {
+        var root = Plugin.Instance?.ResolvedOutputPath;
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+        {
+            return Ok(new LibraryListing());
+        }
+
+        return Ok(new LibraryListing
+        {
+            RootPath = root,
+            Movies = ListTitles(Path.Combine(root, StrmLibrary.MoviesDirName), "movie"),
+            Shows = ListTitles(Path.Combine(root, StrmLibrary.ShowsDirName), "series")
+        });
+    }
+
+    private static IReadOnlyList<LibraryTitle> ListTitles(string dir, string type)
+    {
+        var result = new List<LibraryTitle>();
+        if (!Directory.Exists(dir))
+        {
+            return result;
+        }
+
+        foreach (var folder in Directory.EnumerateDirectories(dir).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+        {
+            var folderName = Path.GetFileName(folder);
+            if (string.IsNullOrWhiteSpace(folderName))
+            {
+                continue;
+            }
+
+            var year = (string?)null;
+            var name = folderName;
+            var match = System.Text.RegularExpressions.Regex.Match(folderName, @"^(.*?)(?:\s*\((\d{4})\))?$");
+            if (match.Success)
+            {
+                name = match.Groups[1].Value.Trim();
+                year = match.Groups[2].Success ? match.Groups[2].Value : null;
+            }
+
+            result.Add(new LibraryTitle { Name = name, Year = year, Type = type });
+        }
+
+        return result;
     }
 
     private (string AddonUrl, string? ExtraQuery) RequireConnection()
