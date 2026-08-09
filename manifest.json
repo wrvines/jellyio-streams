@@ -8,6 +8,14 @@
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
       {
+        "version": "1.0.2.4",
+        "changelog": "Fix: read camelCase JSON from API responses, write PascalCase for config save (Jellyfin's config deserializer has no naming policy). Handle HTTP 204 from config endpoint as save success.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/wrvines/jellyio-streams/releases/download/v1.0.2.4/jellyio-streams_1.0.2.4.zip",
+        "checksum": "A36E07546D7B9F87DE56FA59E2F879D9",
+        "timestamp": "2026-08-09T00:00:00Z"
+      },
+      {
         "version": "1.0.2.3",
         "changelog": "Fix: config page now reads and writes camelCase JSON keys matching Jellyfin's API serializer. This was the root cause of Save appearing to do nothing.",
         "targetAbi": "10.11.0.0",

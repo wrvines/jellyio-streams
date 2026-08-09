@@ -191,18 +191,18 @@
                     // Build the config from the form directly so Save always works,
                     // even if the initial config load failed.
                     var config = {
-                        addonUrl: document.getElementById('AddonUrl').value,
-                        extraQuery: document.getElementById('ExtraQuery').value,
-                        outputPath: document.getElementById('OutputPath').value,
-                        enabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
-                        maxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
-                        maxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
-                        maxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
-                        refreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
-                        syncEpisodes: document.getElementById('SyncEpisodes').checked
+                        AddonUrl: document.getElementById('AddonUrl').value,
+                        ExtraQuery: document.getElementById('ExtraQuery').value,
+                        OutputPath: document.getElementById('OutputPath').value,
+                        EnabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
+                        MaxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
+                        MaxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
+                        MaxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
+                        RefreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
+                        SyncEpisodes: document.getElementById('SyncEpisodes').checked
                     };
                     if (JellyioConfig.config && JellyioConfig.config.lastFingerprint) {
-                        config.lastFingerprint = JellyioConfig.config.lastFingerprint;
+                        config.LastFingerprint = JellyioConfig.config.lastFingerprint;
                     }
 
                     ApiClient.updatePluginConfiguration(JellyioConfig.pluginUniqueId, config).then(function () {
@@ -210,6 +210,12 @@
                         msg.textContent = "Saved.";
                         setTimeout(function () { msg.textContent = ""; }, 3000);
                     }).catch(function (err) {
+                        if (err && err.status === 204) {
+                            var msg = document.getElementById('saveMessage');
+                            msg.textContent = "Saved.";
+                            setTimeout(function () { msg.textContent = ""; }, 3000);
+                            return;
+                        }
                         JellyioConfig.showHttpError("Save failed:", err);
                     });
                 },
