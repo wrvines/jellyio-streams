@@ -34,14 +34,23 @@ public sealed class RefreshTask : IScheduledTask
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
         var hours = Plugin.Instance?.Configuration.RefreshIntervalHours ?? 0;
-        if (hours <= 0)
+        return BuildTriggers(hours);
+    }
+
+    /// <summary>
+    /// Builds the default triggers for a given refresh interval in hours (0 = no triggers).
+    /// </summary>
+    public static IEnumerable<TaskTriggerInfo> BuildTriggers(int intervalHours)
+    {
+        if (intervalHours <= 0)
         {
             yield break;
         }
 
         yield return new TaskTriggerInfo
         {
-            IntervalTicks = TimeSpan.FromHours(hours).Ticks
+            Type = TaskTriggerInfoType.IntervalTrigger,
+            IntervalTicks = TimeSpan.FromHours(intervalHours).Ticks
         };
     }
 }
