@@ -355,13 +355,45 @@
 
                 Controller.prototype.syncNow = function () {
                     var self = this;
+                    var btn = this.el(".btnSync");
+                    if (btn.disabled) { return; }
+                    btn.disabled = true;
+                    btn.textContent = "Syncing…";
+                    this.setText(".syncResult", "Sync started…");
+
+                    var start = Date.now();
+                    var pollTimer = null;
+                    var stopPoll = function () {
+                        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                    };
+
+                    // While the sync request is running, poll the status endpoint so the user
+                    // sees live progress instead of a spinner that looks hung.
+                    var poll = function () {
+                        ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
+                            if (pick(status, "IsSyncing")) {
+                                var elapsed = Math.round((Date.now() - start) / 1000);
+                                var message = pick(status, "ProgressMessage") || "";
+                                var pct = pick(status, "PercentComplete");
+                                var line = "Syncing… " + elapsed + "s";
+                                if (typeof pct === "number" && pct >= 0) { line += " (" + Math.round(pct) + "%)"; }
+                                if (message) { line += " — " + message; }
+                                self.setText(".syncResult", line);
+                            }
+                        }).catch(function () { /* transient; keep polling */ });
+                    };
+                    pollTimer = setInterval(poll, 2000);
                     loading(true);
+
                     ApiClient.ajax({
                         type: "POST",
                         url: ApiClient.getUrl("AIOStreams/Sync"),
                         dataType: "json"
                     }).then(function (result) {
+                        stopPoll();
                         loading(false);
+                        btn.disabled = false;
+                        btn.textContent = "Sync now";
                         var seconds = (new Date(pick(result, "CompletedAt")) - new Date(pick(result, "StartedAt"))) / 1000;
                         self.setText(".syncResult", "Done in " + (isFinite(seconds) ? seconds.toFixed(1) : "?") + "s - " +
                             pick(result, "Movies") + " movies, " + pick(result, "Shows") + " shows, " +
@@ -370,7 +402,10 @@
                             (pick(result, "LibraryScanTriggered") ? " Library scan triggered." : ""));
                         self.refreshStatus();
                     }).catch(function (err) {
+                        stopPoll();
                         loading(false);
+                        btn.disabled = false;
+                        btn.textContent = "Sync now";
                         self.showHttpError("Sync failed:", err);
                     });
                 };

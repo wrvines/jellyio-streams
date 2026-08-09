@@ -65,6 +65,16 @@ public sealed class SyncStatus
     /// Gets or sets a value indicating whether the server has an addon URL configured.
     /// </summary>
     public bool AddonUrlConfigured { get; set; }
+
+    /// <summary>
+    /// Gets or sets a human readable description of the current sync step (set while syncing).
+    /// </summary>
+    public string? ProgressMessage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the overall sync progress in percent (0-100, set while syncing).
+    /// </summary>
+    public double PercentComplete { get; set; }
 }
 
 /// <summary>
@@ -140,9 +150,13 @@ public sealed class CatalogSynchronizer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 _logger.LogInformation("Syncing catalog {Type}/{Id}", catalog.Type, catalog.Id);
+                _status.ProgressMessage = $"Catalog {done + 1}/{total}: {catalog.Type}/{catalog.Id}";
+                _status.PercentComplete = total > 0 ? done * 100.0 / total : 0;
                 await SyncCatalogAsync(config, catalog, root, result, cancellationToken).ConfigureAwait(false);
                 done++;
                 progress?.Report(done * 100.0 / total);
+                _status.ProgressMessage = $"Catalog {done}/{total} done ({result.Movies} movies, {result.Shows} shows, {result.Episodes} episodes)";
+                _status.PercentComplete = total > 0 ? done * 100.0 / total : 0;
             }
 
             FinishSync(result);
@@ -282,6 +296,7 @@ public sealed class CatalogSynchronizer
         foreach (var item in metas)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _status.ProgressMessage = $"Catalog {catalog.Type}/{catalog.Id}: \"{item.Name}\" — resolving streams…";
 
             if (string.Equals(item.Type, "series", StringComparison.OrdinalIgnoreCase))
             {
@@ -473,11 +488,15 @@ public sealed class CatalogSynchronizer
         _status.IsSyncing = true;
         _status.LastStartedAt = DateTime.UtcNow;
         _status.LastError = null;
+        _status.ProgressMessage = "Starting…";
+        _status.PercentComplete = 0;
     }
 
     private void FinishSync(SyncResult result)
     {
         result.CompletedAt = DateTime.UtcNow;
+        _status.ProgressMessage = null;
+        _status.PercentComplete = 100;
 
         var fingerprint = ComputeFingerprint(Plugin.Instance!.ResolvedOutputPath);
         result.Fingerprint = fingerprint;
@@ -501,6 +520,7 @@ public sealed class CatalogSynchronizer
     {
         _status.IsSyncing = false;
         _status.LastError = ex.Message;
+        _status.ProgressMessage = null;
         _logger.LogError(ex, "AIOStreams sync failed.");
     }
 
