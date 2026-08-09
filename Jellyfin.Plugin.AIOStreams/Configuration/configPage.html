@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jellyio Streams</title>
+</head>
+<body>
+    <div id="AIOStreamsConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage AIOStreamsConfigurationPage"
+        data-require="emby-input,emby-button,emby-select,emby-checkbox,listViewStyle,paper-icon-button-light">
+        <div data-role="content">
+            <div class="content-primary">
+                <div class="readOnlyContent" style="margin:0;">
+                    <div style="display:flex;align-items:center;margin:1em 0;">
+                        <h1 style="margin:0;">Jellyio Streams</h1>
+                        <button is="emby-button" type="button" class="raised btnSave submit mini" style="margin-left:1em;">
+                            <i class="md-icon">save</i>
+                            <span>Save</span>
+                        </button>
+                        <div id="saveMessage" class="fieldDescription" style="margin-left:1em;"></div>
+                    </div>
+
+                    <div class="sectionTitle">Connection</div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="AddonUrl" label="AIOStreams addon URL:" />
+                        <div class="fieldDescription">
+                            Your AIOStreams install URL. Paste it as shown on the addon's "Save &amp; Install" page,
+                            e.g. <code>https://stream.example.com/stremio/&lt;uuid&gt;/&lt;token&gt;</code>
+                            (a trailing <code>/manifest.json</code> is also accepted). For a public instance without a user config, use the instance root.
+                        </div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="ExtraQuery" label="Extra query parameters:" />
+                        <div class="fieldDescription">Optional parameters appended to every addon request (e.g. <code>api_key=xxx</code>). Leave empty unless your setup requires them.</div>
+                    </div>
+                    <div class="buttonContainer">
+                        <button is="emby-button" type="button" class="btnTestConnection">
+                            <i class="md-icon">link</i>
+                            <span>Test connection</span>
+                        </button>
+                    </div>
+                    <div id="connectionResult" class="fieldDescription"></div>
+
+                    <div class="sectionTitle">Library</div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="OutputPath" label="Output folder:" />
+                        <div class="fieldDescription">
+                            Folder where the .strm files are generated. Add it as a Jellyfin library of type
+                            "Mixed Movies and Shows" (or add <code>Movies</code> / <code>Shows</code> separately).
+                            Leave empty to use <code id="defaultPathHint"></code>.
+                        </div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="EnabledCatalogIds" label="Catalog ids:" />
+                        <div class="fieldDescription">Comma separated catalog ids to sync (as listed by "Test connection"). Leave empty to sync all movie/series catalogs.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="MaxItemsPerCatalog" label="Titles per catalog:" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="MaxStreamsPerTitle" label="Streams per title:" />
+                        <div class="fieldDescription">Each stream becomes a selectable "version" of the item in Jellyfin. Zero = all streams.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="MaxEpisodesPerSeries" label="Episodes per series:" />
+                        <div class="fieldDescription">Only the most recent episodes are resolved when set. Zero = all episodes.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="RefreshIntervalHours" label="Auto refresh interval (hours):" />
+                        <div class="fieldDescription">Zero = refresh manually only. Restart Jellyfin after changing this value.</div>
+                    </div>
+                    <label class="checkboxContainer">
+                        <input id="SyncEpisodes" type="checkbox" is="emby-checkbox" checked="checked" />
+                        <span>Resolve episodes of series</span>
+                    </label>
+
+                    <div class="sectionTitle">Actions</div>
+                    <div class="buttonContainer">
+                        <button is="emby-button" type="button" class="btnSync raised">
+                            <i class="md-icon">sync</i>
+                            <span>Sync now</span>
+                        </button>
+                    </div>
+                    <div id="syncResult" class="fieldDescription"></div>
+
+                    <div class="sectionTitle">Search &amp; add</div>
+                    <div style="display:flex;align-items:flex-end;flex-wrap:wrap;gap:0.5em;">
+                        <div class="selectContainer" style="flex:0 0 12em;">
+                            <select id="searchType" is="emby-select" label="Type:">
+                                <option value="movie">Movie</option>
+                                <option value="series">Series</option>
+                            </select>
+                        </div>
+                        <div class="inputContainer" style="flex:1 1 24em;">
+                            <input is="emby-input" type="text" id="searchTerm" label="Search AIOStreams:" />
+                        </div>
+                        <button is="emby-button" type="button" class="btnSearch">
+                            <i class="md-icon">search</i>
+                            <span>Search</span>
+                        </button>
+                    </div>
+                    <div class="paperList searchResults" style="margin-top:1em;"></div>
+                    <div class="sectionTitle">Status</div>
+                    <div id="statusBox" class="fieldDescription"></div>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var AIOStreamsConfigPage = {
+                pluginUniqueId: "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
+                config: null,
+
+                load: function (page) {
+                    ApiClient.getPluginConfiguration(AIOStreamsConfigPage.pluginUniqueId).then(function (config) {
+                        AIOStreamsConfigPage.config = config;
+                        page.querySelector('#AddonUrl').value = config.AddonUrl || "";
+                        page.querySelector('#ExtraQuery').value = config.ExtraQuery || "";
+                        page.querySelector('#OutputPath').value = config.OutputPath || "";
+                        page.querySelector('#EnabledCatalogIds').value = config.EnabledCatalogIds || "";
+                        page.querySelector('#MaxItemsPerCatalog').value = config.MaxItemsPerCatalog || 20;
+                        page.querySelector('#MaxStreamsPerTitle').value = config.MaxStreamsPerTitle || 5;
+                        page.querySelector('#MaxEpisodesPerSeries').value = config.MaxEpisodesPerSeries || 0;
+                        page.querySelector('#RefreshIntervalHours').value = config.RefreshIntervalHours || 0;
+                        page.querySelector('#SyncEpisodes').checked = config.SyncEpisodes !== false;
+
+                        var defaultPath = ApiClient.getUrl('AIOStreams/Status');
+                        var hint = page.querySelector('#defaultPathHint');
+                        if (hint) {
+                            hint.textContent = '(see status below)';
+                        }
+                        AIOStreamsConfigPage.refreshStatus(page);
+                        Dashboard.hideLoadingMsg();
+                    });
+                },
+
+                save: function () {
+                    var page = document.querySelector('.AIOStreamsConfigurationPage');
+                    var config = AIOStreamsConfigPage.config;
+                    config.AddonUrl = page.querySelector('#AddonUrl').value;
+                    config.ExtraQuery = page.querySelector('#ExtraQuery').value;
+                    config.OutputPath = page.querySelector('#OutputPath').value;
+                    config.EnabledCatalogIds = page.querySelector('#EnabledCatalogIds').value;
+                    config.MaxItemsPerCatalog = parseInt(page.querySelector('#MaxItemsPerCatalog').value) || 0;
+                    config.MaxStreamsPerTitle = parseInt(page.querySelector('#MaxStreamsPerTitle').value) || 0;
+                    config.MaxEpisodesPerSeries = parseInt(page.querySelector('#MaxEpisodesPerSeries').value) || 0;
+                    config.RefreshIntervalHours = parseInt(page.querySelector('#RefreshIntervalHours').value) || 0;
+                    config.SyncEpisodes = page.querySelector('#SyncEpisodes').checked;
+
+                    ApiClient.updatePluginConfiguration(AIOStreamsConfigPage.pluginUniqueId, config).then(function () {
+                        var msg = page.querySelector('#saveMessage');
+                        msg.textContent = "Saved.";
+                        setTimeout(function () { msg.textContent = ""; }, 3000);
+                    });
+                },
+
+                testConnection: function (page) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Manifest')).then(function (manifest) {
+                        Dashboard.hideLoadingMsg();
+                        var out = page.querySelector('#connectionResult');
+                        out.innerHTML = "Connected to <b>" + escapeHtml(manifest.Name) + "</b> v" + escapeHtml(manifest.Version) +
+                            ". Catalogs: " + (manifest.Catalogs || []).map(function (c) {
+                                return "<code>" + escapeHtml(c.Type) + " / " + escapeHtml(c.Id) + "</code>";
+                            }).join(", ") || "none";
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        page.querySelector('#connectionResult').textContent = "Connection failed: " + (err.message || err);
+                    });
+                },
+
+                syncNow: function (page) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({
+                        type: 'POST',
+                        url: ApiClient.getUrl('AIOStreams/Sync'),
+                        dataType: 'json'
+                    }).then(function (result) {
+                        Dashboard.hideLoadingMsg();
+                        AIOStreamsConfigPage.renderResult(page.querySelector('#syncResult'), result);
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        page.querySelector('#syncResult').textContent = "Sync failed: " + (err.message || err);
+                    });
+                },
+
+                renderResult: function (el, result) {
+                    el.textContent = "Done in " + ((result.CompletedAt - result.StartedAt) / 1000).toFixed(1) + "s - " +
+                        result.Movies + " movies, " + result.Shows + " shows, " + result.Episodes + " episodes, " +
+                        result.Streams + " streams (" + result.Files + " files written), " +
+                        result.Skipped + " skipped." +
+                        (result.LibraryScanTriggered ? " Library scan triggered." : "");
+                },
+
+                refreshStatus: function (page) {
+                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Status')).then(function (status) {
+                        var el = page.querySelector('#statusBox');
+                        if (!el) { return; }
+                        if (status.IsSyncing) {
+                            el.textContent = "A sync is currently running...";
+                        } else if (status.LastError) {
+                            el.textContent = "Last run failed: " + status.LastError;
+                        } else if (status.LastResult) {
+                            AIOStreamsConfigPage.renderResult(el, status.LastResult);
+                            el.textContent = "Last run: " + el.textContent;
+                        } else {
+                            el.textContent = "No sync has run yet. Configure the addon URL, then press \"Sync now\".";
+                        }
+                    });
+                },
+
+                search: function (page) {
+                    var term = page.querySelector('#searchTerm').value;
+                    var type = page.querySelector('#searchType').value;
+                    if (!term) { return; }
+
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Search', { term: term, type: type, limit: 20 })).then(function (results) {
+                        Dashboard.hideLoadingMsg();
+                        var list = page.querySelector('.searchResults');
+                        var html = "";
+                        (results || []).forEach(function (item) {
+                            html += '<div class="listItem">';
+                            if (item.Poster) {
+                                html += '<img class="listItemImage" src="' + escapeHtml(item.Poster) + '" style="width:5em;height:7em;object-fit:cover;" />';
+                            } else {
+                                html += '<i class="listItemIcon md-icon">movie</i>';
+                            }
+                            html += '<div class="listItemBody two-line">';
+                            html += '<h3 class="listItemBodyText">' + escapeHtml(item.Name) + '</h3>';
+                            html += '<div class="listItemBodyText secondary">' + escapeHtml(item.ReleaseInfo || "") + (item.Description ? " - " + escapeHtml(item.Description.slice(0, 120)) : "") + '</div>';
+                            html += '</div>';
+                            html += '<button type="button" is="paper-icon-button-light" data-id="' + escapeHtml(item.Id) + '" data-name="' + escapeHtml(item.Name) + '" data-type="' + escapeHtml(item.Type) + '" data-release="' + escapeHtml(item.ReleaseInfo || "") + '" title="Add to library"><i class="md-icon">add</i></button>';
+                            html += '</div>';
+                        });
+                        list.innerHTML = html || '<div class="fieldDescription">No results.</div>';
+
+                        list.querySelectorAll('button[data-id]').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                AIOStreamsConfigPage.addTitle(page, btn);
+                            });
+                        });
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        page.querySelector('.searchResults').textContent = "Search failed: " + (err.message || err);
+                    });
+                },
+
+                addTitle: function (page, btn) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({
+                        type: 'POST',
+                        url: ApiClient.getUrl('AIOStreams/Add'),
+                        data: JSON.stringify({
+                            type: btn.getAttribute('data-type') || 'movie',
+                            id: btn.getAttribute('data-id'),
+                            name: btn.getAttribute('data-name'),
+                            releaseInfo: btn.getAttribute('data-release')
+                        }),
+                        contentType: 'application/json',
+                        dataType: 'json'
+                    }).then(function (result) {
+                        Dashboard.hideLoadingMsg();
+                        AIOStreamsConfigPage.renderResult(page.querySelector('#syncResult'), result);
+                        btn.innerHTML = '<i class="md-icon">check</i>';
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        page.querySelector('#syncResult').textContent = "Add failed: " + (err.message || err);
+                    });
+                }
+            };
+
+            function escapeHtml(value) {
+                return String(value == null ? "" : value)
+                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var page = document.querySelector('.AIOStreamsConfigurationPage');
+                if (!page) { return; }
+
+                page.querySelector('.btnSave').addEventListener('click', function () { AIOStreamsConfigPage.save(); });
+                page.querySelector('.btnTestConnection').addEventListener('click', function () { AIOStreamsConfigPage.testConnection(page); });
+                page.querySelector('.btnSync').addEventListener('click', function () { AIOStreamsConfigPage.syncNow(page); });
+                page.querySelector('.btnSearch').addEventListener('click', function () { AIOStreamsConfigPage.search(page); });
+                page.querySelector('#searchTerm').addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') { AIOStreamsConfigPage.search(page); }
+                });
+
+                AIOStreamsConfigPage.load(page);
+            });
+        </script>
+    </div>
+</body>
+</html>
