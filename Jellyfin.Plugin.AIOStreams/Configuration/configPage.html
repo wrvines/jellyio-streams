@@ -29,343 +29,453 @@
             <div style="display:flex; align-items:center; gap:1em; margin-bottom:0.5em;">
                 <h1 style="margin:0;">Jellyio Streams</h1>
                 <button type="button" class="btnSave" style="padding:0.5em 1.2em; cursor:pointer;">Save</button>
-                <span id="saveMessage" class="jellyio-result"></span>
+                <span class="saveMessage jellyio-result"></span>
             </div>
 
             <div class="jellyio-section">Connection</div>
             <div class="jellyio-field">
                 <label for="AddonUrl">AIOStreams addon URL</label>
-                <input type="text" id="AddonUrl" placeholder="https://stream.example.com/stremio/&lt;uuid&gt;/&lt;token&gt;" />
+                <input type="text" id="AddonUrl" class="fldAddonUrl" placeholder="https://stream.example.com/stremio/&lt;uuid&gt;/&lt;token&gt;" />
                 <div class="jellyio-hint">Your AIOStreams install URL from the addon's "Save &amp; Install" page. A trailing /manifest.json is also accepted.</div>
             </div>
             <div class="jellyio-field">
                 <label for="ExtraQuery">Extra query parameters</label>
-                <input type="text" id="ExtraQuery" placeholder="api_key=xxx" />
+                <input type="text" id="ExtraQuery" class="fldExtraQuery" placeholder="api_key=xxx" />
                 <div class="jellyio-hint">Optional parameters appended to every addon request. Leave empty unless required.</div>
             </div>
             <div class="jellyio-actions">
                 <button type="button" class="btnTestConnection" style="padding:0.5em 1.1em; cursor:pointer;">Test connection</button>
             </div>
-            <div id="connectionResult" class="jellyio-result"></div>
+            <div class="connectionResult jellyio-result"></div>
 
             <div class="jellyio-section">Library</div>
             <div class="jellyio-field">
                 <label for="OutputPath">Output folder</label>
-                <input type="text" id="OutputPath" />
+                <input type="text" id="OutputPath" class="fldOutputPath" />
                 <div class="jellyio-hint">Folder where the .strm files are generated. Add it as a Jellyfin library of type "Mixed Movies and Shows". Leave empty for the default folder.</div>
             </div>
             <div class="jellyio-field">
                 <label for="EnabledCatalogIds">Catalog ids</label>
-                <input type="text" id="EnabledCatalogIds" placeholder="trending-movie,top-shows" />
+                <input type="text" id="EnabledCatalogIds" class="fldEnabledCatalogIds" placeholder="trending-movie,top-shows" />
                 <div class="jellyio-hint">Comma separated catalog ids (listed by "Test connection"). Empty = all movie/series catalogs.</div>
             </div>
             <div class="jellyio-field">
                 <label for="MaxItemsPerCatalog">Titles per catalog</label>
-                <input type="number" id="MaxItemsPerCatalog" />
+                <input type="number" id="MaxItemsPerCatalog" class="fldMaxItemsPerCatalog" />
             </div>
             <div class="jellyio-field">
                 <label for="MaxStreamsPerTitle">Streams per title</label>
-                <input type="number" id="MaxStreamsPerTitle" />
+                <input type="number" id="MaxStreamsPerTitle" class="fldMaxStreamsPerTitle" />
                 <div class="jellyio-hint">Each stream becomes a selectable "version" in Jellyfin. Zero = all streams.</div>
             </div>
             <div class="jellyio-field">
                 <label for="MaxEpisodesPerSeries">Episodes per series</label>
-                <input type="number" id="MaxEpisodesPerSeries" />
+                <input type="number" id="MaxEpisodesPerSeries" class="fldMaxEpisodesPerSeries" />
                 <div class="jellyio-hint">Only the most recent episodes are resolved when set. Zero = all episodes.</div>
             </div>
             <div class="jellyio-field">
                 <label for="RefreshIntervalHours">Auto refresh interval (hours)</label>
-                <input type="number" id="RefreshIntervalHours" />
+                <input type="number" id="RefreshIntervalHours" class="fldRefreshIntervalHours" />
                 <div class="jellyio-hint">Zero = manual only. Restart Jellyfin after changing this value.</div>
             </div>
             <div class="jellyio-field">
-                <label><input type="checkbox" id="SyncEpisodes" checked="checked" style="width:auto;" /> Resolve episodes of series</label>
+                <label><input type="checkbox" id="SyncEpisodes" class="fldSyncEpisodes" checked="checked" style="width:auto;" /> Resolve episodes of series</label>
             </div>
 
             <div class="jellyio-section">Actions</div>
             <div class="jellyio-actions">
                 <button type="button" class="btnSync" style="padding:0.5em 1.1em; cursor:pointer;">Sync now</button>
             </div>
-            <div id="syncResult" class="jellyio-result"></div>
+            <div class="syncResult jellyio-result"></div>
 
             <div class="jellyio-section">Search &amp; add</div>
             <div class="jellyio-searchrow">
                 <div class="jellyio-field">
                     <label for="searchType">Type</label>
-                    <select id="searchType">
+                    <select id="searchType" class="fldSearchType">
                         <option value="movie">Movie</option>
                         <option value="series">Series</option>
                     </select>
                 </div>
                 <div class="jellyio-field" style="flex:1 1 18em;">
                     <label for="searchTerm">Search AIOStreams</label>
-                    <input type="text" id="searchTerm" />
+                    <input type="text" id="searchTerm" class="fldSearchTerm" />
                 </div>
                 <button type="button" class="btnSearch" style="padding:0.5em 1.1em; cursor:pointer;">Search</button>
             </div>
-            <div id="searchResults" class="jellyio-result"></div>
+            <div class="searchResults jellyio-result"></div>
 
             <div class="jellyio-section">Status</div>
-            <div id="statusBox" class="jellyio-result"></div>
+            <div class="statusBox jellyio-result"></div>
         </div>
 
         <script type="text/javascript">
-            var JellyioConfig = {
-                pluginUniqueId: "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
-                config: null,
-                initialized: false,
+            (function () {
+                var PLUGIN_ID = "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b";
+                var PAGE_SELECTOR = ".JellyioConfigurationPage";
 
-                init: function () {
-                    if (JellyioConfig.initialized) { return; }
-                    var page = document.getElementById('JellyioConfigurationPage');
-                    if (!page) { setTimeout(JellyioConfig.init, 0); return; }
-                    JellyioConfig.initialized = true;
+                // The dashboard can keep several copies of a plugin page in the DOM (the previous
+                // view stays cached while a new one is inserted). document.getElementById() then
+                // returns the stale, hidden copy, so reads/writes hit invisible inputs. Everything
+                // below is therefore scoped to one specific page element.
+                function currentPage() {
+                    var own = document.currentScript;
+                    var scoped = own && own.closest ? own.closest(PAGE_SELECTOR) : null;
+                    if (scoped) { return scoped; }
+                    var all = document.querySelectorAll(PAGE_SELECTOR);
+                    return all.length ? all[all.length - 1] : null;
+                }
 
-                    page.querySelector('.btnSave').addEventListener('click', JellyioConfig.save);
-                    page.querySelector('.btnTestConnection').addEventListener('click', JellyioConfig.testConnection);
-                    page.querySelector('.btnSync').addEventListener('click', JellyioConfig.syncNow);
-                    page.querySelector('.btnSearch').addEventListener('click', JellyioConfig.search);
-                    page.querySelector('#searchTerm').addEventListener('keypress', function (e) {
-                        if (e.key === 'Enter') { JellyioConfig.search(); }
-                    });
+                // Jellyfin serializes API responses PascalCase by default but can emit camelCase
+                // when a camelCase profile is negotiated. Read both.
+                function pick(obj, name) {
+                    if (!obj || typeof obj !== "object") { return undefined; }
+                    if (Object.prototype.hasOwnProperty.call(obj, name)) { return obj[name]; }
+                    var lower = String(name).toLowerCase();
+                    for (var key in obj) {
+                        if (Object.prototype.hasOwnProperty.call(obj, key) && key.toLowerCase() === lower) {
+                            return obj[key];
+                        }
+                    }
+                    return undefined;
+                }
 
-                    JellyioConfig.load();
-                },
+                function escapeHtml(value) {
+                    return String(value == null ? "" : value)
+                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+                }
 
-                showError: function (message) {
-                    try {
-                        var el = document.getElementById('statusBox');
-                        if (el) { el.textContent = "ERROR: " + message; }
-                    } catch (e) { }
-                    try { console.error(message); } catch (e) { }
-                },
+                // The addon URL embeds a user token; never echo it back in full.
+                function maskUrl(value) {
+                    var url = String(value || "");
+                    if (url.length <= 24) { return url; }
+                    return url.slice(0, 16) + "…" + url.slice(-6);
+                }
 
-                // Turns an ApiClient rejection (a fetch Response on HTTP errors) into a readable message.
-                showHttpError: function (context, err) {
-                    if (err && typeof err.status === 'number') {
-                        var self = this;
+                function loading(show) {
+                    if (!window.Dashboard) { return; }
+                    if (show && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
+                    if (!show && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                }
+
+                function Controller(page) {
+                    this.page = page;
+                    this.loadedConfig = null;
+                }
+
+                Controller.prototype.el = function (selector) {
+                    return this.page.querySelector(selector);
+                };
+
+                Controller.prototype.setText = function (selector, text) {
+                    var el = this.el(selector);
+                    if (el) { el.textContent = text; }
+                };
+
+                Controller.prototype.showError = function (message) {
+                    this.setText(".statusBox", "ERROR: " + message);
+                    try { console.error("[Jellyio Streams] " + message); } catch (e) { /* ignore */ }
+                };
+
+                // An ApiClient rejection is usually the raw fetch Response.
+                Controller.prototype.showHttpError = function (context, err) {
+                    var self = this;
+                    if (err && typeof err.status === "number") {
                         var base = context + " HTTP " + err.status + (err.url ? " (" + err.url + ")" : "");
-                        if (typeof err.text === 'function') {
+                        if (typeof err.text === "function") {
                             err.text().then(function (body) {
-                                var detail = body ? " - " + body.slice(0, 400) : "";
-                                self.showError(base + detail);
-                            }).catch(function () {
-                                self.showError(base);
-                            });
+                                self.showError(base + (body ? " - " + body.slice(0, 400) : ""));
+                            }).catch(function () { self.showError(base); });
                         } else {
                             self.showError(base);
                         }
                         return;
                     }
-                    this.showError(context + (err && err.message ? err.message : err));
-                },
+                    this.showError(context + " " + (err && err.message ? err.message : err));
+                };
 
-                load: function () {
-                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
-                    try {
-                        if (window.Dashboard && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
-                        ApiClient.getPluginConfiguration(JellyioConfig.pluginUniqueId).then(function (config) {
-                            JellyioConfig.config = config;
-                            document.getElementById('AddonUrl').value = config.addonUrl || "";
-                            document.getElementById('ExtraQuery').value = config.extraQuery || "";
-                            document.getElementById('OutputPath').value = config.outputPath || "";
-                            document.getElementById('EnabledCatalogIds').value = config.enabledCatalogIds || "";
-                            document.getElementById('MaxItemsPerCatalog').value = config.maxItemsPerCatalog || 20;
-                            document.getElementById('MaxStreamsPerTitle').value = config.maxStreamsPerTitle || 5;
-                            document.getElementById('MaxEpisodesPerSeries').value = config.maxEpisodesPerSeries || 0;
-                            document.getElementById('RefreshIntervalHours').value = config.refreshIntervalHours || 0;
-                            document.getElementById('SyncEpisodes').checked = config.syncEpisodes !== false;
-                            JellyioConfig.refreshStatus();
-                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                        }).catch(function (err) {
-                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                            JellyioConfig.showHttpError("Failed to load plugin config:", err);
-                        });
-                    } catch (err) {
-                        JellyioConfig.showHttpError("Failed to load plugin config:", err);
-                    }
-                },
-
-                save: function () {
-                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
-                    // Build the config from the form directly so Save always works,
-                    // even if the initial config load failed.
-                    var config = {
-                        AddonUrl: document.getElementById('AddonUrl').value,
-                        ExtraQuery: document.getElementById('ExtraQuery').value,
-                        OutputPath: document.getElementById('OutputPath').value,
-                        EnabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
-                        MaxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
-                        MaxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
-                        MaxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
-                        RefreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
-                        SyncEpisodes: document.getElementById('SyncEpisodes').checked
+                Controller.prototype.applyConfig = function (config) {
+                    this.loadedConfig = config;
+                    var value = function (name, fallback) {
+                        var v = pick(config, name);
+                        return v === undefined || v === null ? fallback : v;
                     };
-                    if (JellyioConfig.config && JellyioConfig.config.lastFingerprint) {
-                        config.LastFingerprint = JellyioConfig.config.lastFingerprint;
+
+                    this.el(".fldAddonUrl").value = value("AddonUrl", "");
+                    this.el(".fldExtraQuery").value = value("ExtraQuery", "");
+                    this.el(".fldOutputPath").value = value("OutputPath", "");
+                    this.el(".fldEnabledCatalogIds").value = value("EnabledCatalogIds", "");
+                    this.el(".fldMaxItemsPerCatalog").value = value("MaxItemsPerCatalog", 20);
+                    this.el(".fldMaxStreamsPerTitle").value = value("MaxStreamsPerTitle", 5);
+                    this.el(".fldMaxEpisodesPerSeries").value = value("MaxEpisodesPerSeries", 0);
+                    this.el(".fldRefreshIntervalHours").value = value("RefreshIntervalHours", 0);
+                    this.el(".fldSyncEpisodes").checked = value("SyncEpisodes", true) !== false;
+                };
+
+                Controller.prototype.load = function () {
+                    var self = this;
+                    if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
+
+                    loading(true);
+                    ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
+                        loading(false);
+                        self.applyConfig(config);
+                        self.refreshStatus();
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Failed to load plugin config:", err);
+                    });
+                };
+
+                // Jellyfin deserializes the posted configuration with a case-sensitive serializer
+                // (no naming policy), so the property names must be PascalCase.
+                Controller.prototype.readForm = function () {
+                    var number = function (selector) {
+                        return parseInt(this.el(selector).value, 10) || 0;
+                    }.bind(this);
+
+                    var config = {
+                        AddonUrl: this.el(".fldAddonUrl").value.trim(),
+                        ExtraQuery: this.el(".fldExtraQuery").value.trim(),
+                        OutputPath: this.el(".fldOutputPath").value.trim(),
+                        EnabledCatalogIds: this.el(".fldEnabledCatalogIds").value.trim(),
+                        MaxItemsPerCatalog: number(".fldMaxItemsPerCatalog"),
+                        MaxStreamsPerTitle: number(".fldMaxStreamsPerTitle"),
+                        MaxEpisodesPerSeries: number(".fldMaxEpisodesPerSeries"),
+                        RefreshIntervalHours: number(".fldRefreshIntervalHours"),
+                        SyncEpisodes: this.el(".fldSyncEpisodes").checked
+                    };
+
+                    var fingerprint = pick(this.loadedConfig, "LastFingerprint");
+                    if (fingerprint) { config.LastFingerprint = fingerprint; }
+                    return config;
+                };
+
+                Controller.prototype.save = function () {
+                    var self = this;
+                    if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
+
+                    var config = this.readForm();
+
+                    // Never let a failed load turn Save into a wipe of the stored settings.
+                    if (!this.loadedConfig && !config.AddonUrl) {
+                        this.showError("The current configuration could not be read, so saving empty settings is blocked. Reload the page, or enter the addon URL before saving.");
+                        return;
                     }
 
-                    ApiClient.updatePluginConfiguration(JellyioConfig.pluginUniqueId, config).then(function () {
-                        var msg = document.getElementById('saveMessage');
-                        msg.textContent = "Saved.";
-                        setTimeout(function () { msg.textContent = ""; }, 3000);
+                    this.setText(".saveMessage", "Saving…");
+                    loading(true);
+
+                    ApiClient.updatePluginConfiguration(PLUGIN_ID, config).then(function () {
+                        return self.verifySave(config);
                     }).catch(function (err) {
-                        if (err && err.status === 204) {
-                            var msg = document.getElementById('saveMessage');
-                            msg.textContent = "Saved.";
-                            setTimeout(function () { msg.textContent = ""; }, 3000);
+                        // A 204 No Content is the documented success response; some clients reject
+                        // it while trying to parse an empty body.
+                        if (err && err.status === 204) { return self.verifySave(config); }
+                        loading(false);
+                        self.setText(".saveMessage", "");
+                        self.showHttpError("Save failed:", err);
+                    });
+                };
+
+                // Re-read the configuration so the page reports what the server actually stored
+                // instead of assuming the POST took effect.
+                Controller.prototype.verifySave = function (sent) {
+                    var self = this;
+                    return ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
+                        loading(false);
+                        self.loadedConfig = config;
+
+                        var stored = pick(config, "AddonUrl") || "";
+                        if (stored === sent.AddonUrl) {
+                            self.setText(".saveMessage", sent.AddonUrl
+                                ? "Saved. Addon URL: " + maskUrl(stored)
+                                : "Saved.");
+                            self.refreshStatus();
+                            setTimeout(function () { self.setText(".saveMessage", ""); }, 5000);
                             return;
                         }
-                        JellyioConfig.showHttpError("Save failed:", err);
-                    });
-                },
 
-                testConnection: function () {
-                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
-                    try {
-                        if (window.Dashboard && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
-                        ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Manifest')).then(function (manifest) {
-                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                            var catalogs = (manifest.Catalogs || []).map(function (c) {
-                                return c.Type + " / " + c.Id;
-                            }).join(", ");
-                            document.getElementById('connectionResult').textContent =
-                                "Connected to " + manifest.Name + " v" + manifest.Version +
-                                (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)");
-                        }).catch(function (err) {
-                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
-                            JellyioConfig.showHttpError("Connection failed:", err);
-                        });
-                    } catch (err) {
-                        JellyioConfig.showHttpError("Connection failed:", err);
-                    }
-                },
-
-                syncNow: function () {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.ajax({
-                        type: 'POST',
-                        url: ApiClient.getUrl('AIOStreams/Sync'),
-                        dataType: 'json'
-                    }).then(function (result) {
-                        Dashboard.hideLoadingMsg();
-                        JellyioConfig.renderResult(document.getElementById('syncResult'), result);
+                        self.setText(".saveMessage", "");
+                        self.showError("The server did not store the addon URL (it now reports \""
+                            + maskUrl(stored) + "\"). Check the Jellyfin logs for a plugin configuration error.");
                     }).catch(function (err) {
-                        Dashboard.hideLoadingMsg();
-                        JellyioConfig.showHttpError("Sync failed:", err);
+                        loading(false);
+                        self.setText(".saveMessage", "Saved (could not verify).");
+                        self.showHttpError("Verification failed:", err);
                     });
-                },
+                };
 
-                renderResult: function (el, result) {
-                    el.textContent = "Done in " + ((result.CompletedAt - result.StartedAt) / 1000).toFixed(1) + "s - " +
-                        result.Movies + " movies, " + result.Shows + " shows, " + result.Episodes + " episodes, " +
-                        result.Streams + " streams (" + result.Files + " files written), " + result.Skipped + " skipped." +
-                        (result.LibraryScanTriggered ? " Library scan triggered." : "");
-                },
+                Controller.prototype.testConnection = function () {
+                    var self = this;
+                    if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
 
-                refreshStatus: function () {
-                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Status')).then(function (status) {
-                        var el = document.getElementById('statusBox');
-                        if (status.IsSyncing) {
-                            el.textContent = "A sync is currently running...";
-                        } else if (status.LastError) {
-                            el.textContent = "Last run failed: " + status.LastError;
-                        } else if (status.LastResult) {
-                            el.textContent = "Last run: " + [
-                                status.LastResult.Movies + " movies",
-                                status.LastResult.Shows + " shows",
-                                status.LastResult.Episodes + " episodes",
-                                status.LastResult.Streams + " streams",
-                                status.LastResult.Files + " files",
-                                status.LastResult.Skipped + " skipped"
-                            ].join(", ") + ".";
+                    loading(true);
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Manifest")).then(function (manifest) {
+                        loading(false);
+                        var catalogs = (pick(manifest, "Catalogs") || []).map(function (c) {
+                            return pick(c, "Type") + " / " + pick(c, "Id");
+                        }).join(", ");
+
+                        self.setText(".connectionResult", "Connected to " + pick(manifest, "Name") +
+                            " v" + pick(manifest, "Version") +
+                            (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)"));
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Connection failed:", err);
+                    });
+                };
+
+                Controller.prototype.syncNow = function () {
+                    var self = this;
+                    loading(true);
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/Sync"),
+                        dataType: "json"
+                    }).then(function (result) {
+                        loading(false);
+                        var seconds = (new Date(pick(result, "CompletedAt")) - new Date(pick(result, "StartedAt"))) / 1000;
+                        self.setText(".syncResult", "Done in " + (isFinite(seconds) ? seconds.toFixed(1) : "?") + "s - " +
+                            pick(result, "Movies") + " movies, " + pick(result, "Shows") + " shows, " +
+                            pick(result, "Episodes") + " episodes, " + pick(result, "Streams") + " streams (" +
+                            pick(result, "Files") + " files written), " + pick(result, "Skipped") + " skipped." +
+                            (pick(result, "LibraryScanTriggered") ? " Library scan triggered." : ""));
+                        self.refreshStatus();
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Sync failed:", err);
+                    });
+                };
+
+                Controller.prototype.refreshStatus = function () {
+                    var self = this;
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
+                        var last = pick(status, "LastResult");
+                        if (pick(status, "IsSyncing")) {
+                            self.setText(".statusBox", "A sync is currently running…");
+                        } else if (pick(status, "LastError")) {
+                            self.setText(".statusBox", "Last run failed: " + pick(status, "LastError"));
+                        } else if (last) {
+                            self.setText(".statusBox", "Last run: " + [
+                                pick(last, "Movies") + " movies",
+                                pick(last, "Shows") + " shows",
+                                pick(last, "Episodes") + " episodes",
+                                pick(last, "Streams") + " streams",
+                                pick(last, "Files") + " files",
+                                pick(last, "Skipped") + " skipped"
+                            ].join(", ") + ".");
                         } else {
-                            el.textContent = "No sync has run yet. Configure the addon URL, then press \"Sync now\".";
+                            self.setText(".statusBox", "No sync has run yet. Configure the addon URL, then press \"Sync now\".");
                         }
+                    }).catch(function (err) {
+                        self.showHttpError("Failed to read status:", err);
                     });
-                },
+                };
 
-                search: function () {
-                    var term = document.getElementById('searchTerm').value;
-                    var type = document.getElementById('searchType').value;
+                Controller.prototype.search = function () {
+                    var self = this;
+                    var term = this.el(".fldSearchTerm").value;
+                    var type = this.el(".fldSearchType").value;
                     if (!term) { return; }
 
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Search', { term: term, type: type, limit: 20 })).then(function (results) {
-                        Dashboard.hideLoadingMsg();
-                        var container = document.getElementById('searchResults');
+                    loading(true);
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Search", { term: term, type: type, limit: 20 })).then(function (results) {
+                        loading(false);
+                        var container = self.el(".searchResults");
                         var html = "";
-                        (results || []).forEach(function (item) {
-                            html += '<div class="jellyio-resultItem">';
-                            if (item.Poster) {
-                                html += '<img src="' + JellyioConfig.escapeHtml(item.Poster) + '" />';
-                            }
-                            html += '<div class="jellyio-resultBody">';
-                            html += '<strong>' + JellyioConfig.escapeHtml(item.Name) + '</strong>';
-                            html += '<span>' + JellyioConfig.escapeHtml(item.ReleaseInfo || "") +
-                                (item.Description ? " - " + JellyioConfig.escapeHtml(item.Description.slice(0, 140)) : "") + '</span>';
-                            html += '</div>';
-                            html += '<button type="button" data-id="' + JellyioConfig.escapeHtml(item.Id) +
-                                '" data-name="' + JellyioConfig.escapeHtml(item.Name) +
-                                '" data-type="' + JellyioConfig.escapeHtml(item.Type) +
-                                '" data-release="' + JellyioConfig.escapeHtml(item.ReleaseInfo || "") + '">Add</button>';
-                            html += '</div>';
-                        });
-                        container.innerHTML = html || '<div>No results.</div>';
 
-                        container.querySelectorAll('button[data-id]').forEach(function (btn) {
-                            btn.addEventListener('click', function () { JellyioConfig.addTitle(btn); });
+                        (results || []).forEach(function (item) {
+                            var poster = pick(item, "Poster");
+                            var description = pick(item, "Description");
+                            html += '<div class="jellyio-resultItem">';
+                            if (poster) { html += '<img src="' + escapeHtml(poster) + '" />'; }
+                            html += '<div class="jellyio-resultBody">';
+                            html += "<strong>" + escapeHtml(pick(item, "Name")) + "</strong>";
+                            html += "<span>" + escapeHtml(pick(item, "ReleaseInfo") || "") +
+                                (description ? " - " + escapeHtml(String(description).slice(0, 140)) : "") + "</span>";
+                            html += "</div>";
+                            html += '<button type="button" data-id="' + escapeHtml(pick(item, "Id")) +
+                                '" data-name="' + escapeHtml(pick(item, "Name")) +
+                                '" data-type="' + escapeHtml(pick(item, "Type")) +
+                                '" data-release="' + escapeHtml(pick(item, "ReleaseInfo") || "") + '">Add</button>';
+                            html += "</div>";
+                        });
+
+                        container.innerHTML = html || "<div>No results.</div>";
+                        container.querySelectorAll("button[data-id]").forEach(function (btn) {
+                            btn.addEventListener("click", function () { self.addTitle(btn); });
                         });
                     }).catch(function (err) {
-                        Dashboard.hideLoadingMsg();
-                        JellyioConfig.showHttpError("Search failed:", err);
+                        loading(false);
+                        self.showHttpError("Search failed:", err);
                     });
-                },
+                };
 
-                addTitle: function (btn) {
-                    Dashboard.showLoadingMsg();
+                Controller.prototype.addTitle = function (btn) {
+                    var self = this;
+                    loading(true);
                     ApiClient.ajax({
-                        type: 'POST',
-                        url: ApiClient.getUrl('AIOStreams/Add'),
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/Add"),
                         data: JSON.stringify({
-                            type: btn.getAttribute('data-type') || 'movie',
-                            id: btn.getAttribute('data-id'),
-                            name: btn.getAttribute('data-name'),
-                            releaseInfo: btn.getAttribute('data-release')
+                            type: btn.getAttribute("data-type") || "movie",
+                            id: btn.getAttribute("data-id"),
+                            name: btn.getAttribute("data-name"),
+                            releaseInfo: btn.getAttribute("data-release")
                         }),
-                        contentType: 'application/json',
-                        dataType: 'json'
+                        contentType: "application/json",
+                        dataType: "json"
                     }).then(function (result) {
-                        Dashboard.hideLoadingMsg();
-                        var text = [
-                            result.Movies + " movies",
-                            result.Shows + " shows",
-                            result.Episodes + " episodes",
-                            result.Streams + " streams",
-                            result.Files + " files"
-                        ].join(", ") + " added.";
-                        document.getElementById('syncResult').textContent = "Added: " + text;
+                        loading(false);
+                        self.setText(".syncResult", "Added: " + [
+                            pick(result, "Movies") + " movies",
+                            pick(result, "Shows") + " shows",
+                            pick(result, "Episodes") + " episodes",
+                            pick(result, "Streams") + " streams",
+                            pick(result, "Files") + " files"
+                        ].join(", ") + ".");
                         btn.textContent = "Done";
                     }).catch(function (err) {
-                        Dashboard.hideLoadingMsg();
-                        JellyioConfig.showHttpError("Add failed:", err);
+                        loading(false);
+                        self.showHttpError("Add failed:", err);
                     });
-                },
+                };
 
-                escapeHtml: function (value) {
-                    return String(value == null ? "" : value)
-                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+                Controller.prototype.bind = function () {
+                    var self = this;
+                    this.el(".btnSave").addEventListener("click", function () { self.save(); });
+                    this.el(".btnTestConnection").addEventListener("click", function () { self.testConnection(); });
+                    this.el(".btnSync").addEventListener("click", function () { self.syncNow(); });
+                    this.el(".btnSearch").addEventListener("click", function () { self.search(); });
+                    this.el(".fldSearchTerm").addEventListener("keypress", function (e) {
+                        if (e.key === "Enter") { self.search(); }
+                    });
+                };
+
+                function init(page) {
+                    if (!page || page.getAttribute("data-jellyio-init") === "1") { return; }
+                    page.setAttribute("data-jellyio-init", "1");
+
+                    var controller = new Controller(page);
+                    controller.bind();
+                    controller.load();
                 }
-            };
 
-            // The page is injected into an already-loaded document, so DOMContentLoaded never fires.
-            // Initialize immediately; fall back to the pageshow event the view manager dispatches.
-            window.addEventListener('error', function (event) {
-                JellyioConfig.showError("Page error: " + (event && event.message ? event.message : "unknown"));
-            });
-            JellyioConfig.init();
-            document.addEventListener('pageshow', JellyioConfig.init);
+                // The page is injected into an already-loaded document, so DOMContentLoaded never
+                // fires. Initialize immediately, and again for each page instance the view manager
+                // shows (the pageshow target is the page element itself).
+                init(currentPage());
+                document.addEventListener("pageshow", function (e) {
+                    var target = e.target;
+                    if (target && target.classList && target.classList.contains("JellyioConfigurationPage")) {
+                        init(target);
+                    } else {
+                        init(currentPage());
+                    }
+                });
+            })();
         </script>
     </div>
 </body>
