@@ -8,6 +8,14 @@
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
       {
+        "version": "1.0.2.3",
+        "changelog": "Fix: config page now reads and writes camelCase JSON keys matching Jellyfin's API serializer. This was the root cause of Save appearing to do nothing.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/wrvines/jellyio-streams/releases/download/v1.0.2.3/jellyio-streams_1.0.2.3.zip",
+        "checksum": "2C046B0B8A25043AE0E51395DC8878CC",
+        "timestamp": "2026-08-09T00:00:00Z"
+      },
+      {
         "version": "1.0.2.2",
         "changelog": "API endpoints return proper 400 responses with readable messages instead of unhandled 500s; config page now shows HTTP status and server error text instead of '[object Response]'.",
         "targetAbi": "10.11.0.0",

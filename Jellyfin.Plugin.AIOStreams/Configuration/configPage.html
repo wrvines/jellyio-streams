@@ -166,15 +166,15 @@
                         if (window.Dashboard && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
                         ApiClient.getPluginConfiguration(JellyioConfig.pluginUniqueId).then(function (config) {
                             JellyioConfig.config = config;
-                            document.getElementById('AddonUrl').value = config.AddonUrl || "";
-                            document.getElementById('ExtraQuery').value = config.ExtraQuery || "";
-                            document.getElementById('OutputPath').value = config.OutputPath || "";
-                            document.getElementById('EnabledCatalogIds').value = config.EnabledCatalogIds || "";
-                            document.getElementById('MaxItemsPerCatalog').value = config.MaxItemsPerCatalog || 20;
-                            document.getElementById('MaxStreamsPerTitle').value = config.MaxStreamsPerTitle || 5;
-                            document.getElementById('MaxEpisodesPerSeries').value = config.MaxEpisodesPerSeries || 0;
-                            document.getElementById('RefreshIntervalHours').value = config.RefreshIntervalHours || 0;
-                            document.getElementById('SyncEpisodes').checked = config.SyncEpisodes !== false;
+                            document.getElementById('AddonUrl').value = config.addonUrl || "";
+                            document.getElementById('ExtraQuery').value = config.extraQuery || "";
+                            document.getElementById('OutputPath').value = config.outputPath || "";
+                            document.getElementById('EnabledCatalogIds').value = config.enabledCatalogIds || "";
+                            document.getElementById('MaxItemsPerCatalog').value = config.maxItemsPerCatalog || 20;
+                            document.getElementById('MaxStreamsPerTitle').value = config.maxStreamsPerTitle || 5;
+                            document.getElementById('MaxEpisodesPerSeries').value = config.maxEpisodesPerSeries || 0;
+                            document.getElementById('RefreshIntervalHours').value = config.refreshIntervalHours || 0;
+                            document.getElementById('SyncEpisodes').checked = config.syncEpisodes !== false;
                             JellyioConfig.refreshStatus();
                             if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
                         }).catch(function (err) {
@@ -191,18 +191,18 @@
                     // Build the config from the form directly so Save always works,
                     // even if the initial config load failed.
                     var config = {
-                        AddonUrl: document.getElementById('AddonUrl').value,
-                        ExtraQuery: document.getElementById('ExtraQuery').value,
-                        OutputPath: document.getElementById('OutputPath').value,
-                        EnabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
-                        MaxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
-                        MaxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
-                        MaxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
-                        RefreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
-                        SyncEpisodes: document.getElementById('SyncEpisodes').checked
+                        addonUrl: document.getElementById('AddonUrl').value,
+                        extraQuery: document.getElementById('ExtraQuery').value,
+                        outputPath: document.getElementById('OutputPath').value,
+                        enabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
+                        maxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
+                        maxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
+                        maxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
+                        refreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
+                        syncEpisodes: document.getElementById('SyncEpisodes').checked
                     };
-                    if (JellyioConfig.config && JellyioConfig.config.LastFingerprint) {
-                        config.LastFingerprint = JellyioConfig.config.LastFingerprint;
+                    if (JellyioConfig.config && JellyioConfig.config.lastFingerprint) {
+                        config.lastFingerprint = JellyioConfig.config.lastFingerprint;
                     }
 
                     ApiClient.updatePluginConfiguration(JellyioConfig.pluginUniqueId, config).then(function () {
