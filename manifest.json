@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Jellyio Streams",
+    "description": "Stream Stremio-addon content from your self-hosted AIOStreams instance. The plugin generates a Jellyfin library (.strm files plus nfo metadata) with a Stremio-like stream picker: each resolved stream becomes a selectable version of the item. Includes catalog sync, search & add, and a scheduled refresh task.",
+    "overview": "Stream Stremio-addon content from a self-hosted AIOStreams instance",
+    "owner": "wrvines",
+    "category": "Metadata",
+    "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release: catalog sync, search & add, version-based stream selection, scheduled refresh.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/wrvines/jellyio-streams/releases/download/v1.0.0.0/jellyio-streams_1.0.0.0.zip",
+        "checksum": "549E9FA5F26B55BE249514585B34EF38",
+        "timestamp": "2026-08-09T00:00:00Z"
+      }
+    ]
+  }
+]
