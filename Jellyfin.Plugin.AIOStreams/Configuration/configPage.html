@@ -118,7 +118,7 @@
                 init: function () {
                     if (JellyioConfig.initialized) { return; }
                     var page = document.getElementById('JellyioConfigurationPage');
-                    if (!page) { return; }
+                    if (!page) { setTimeout(JellyioConfig.init, 0); return; }
                     JellyioConfig.initialized = true;
 
                     page.querySelector('.btnSave').addEventListener('click', JellyioConfig.save);
@@ -132,59 +132,87 @@
                     JellyioConfig.load();
                 },
 
+                showError: function (message) {
+                    try {
+                        var el = document.getElementById('statusBox');
+                        if (el) { el.textContent = "ERROR: " + message; }
+                    } catch (e) { }
+                    try { console.error(message); } catch (e) { }
+                },
+
                 load: function () {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(JellyioConfig.pluginUniqueId).then(function (config) {
-                        JellyioConfig.config = config;
-                        document.getElementById('AddonUrl').value = config.AddonUrl || "";
-                        document.getElementById('ExtraQuery').value = config.ExtraQuery || "";
-                        document.getElementById('OutputPath').value = config.OutputPath || "";
-                        document.getElementById('EnabledCatalogIds').value = config.EnabledCatalogIds || "";
-                        document.getElementById('MaxItemsPerCatalog').value = config.MaxItemsPerCatalog || 20;
-                        document.getElementById('MaxStreamsPerTitle').value = config.MaxStreamsPerTitle || 5;
-                        document.getElementById('MaxEpisodesPerSeries').value = config.MaxEpisodesPerSeries || 0;
-                        document.getElementById('RefreshIntervalHours').value = config.RefreshIntervalHours || 0;
-                        document.getElementById('SyncEpisodes').checked = config.SyncEpisodes !== false;
-                        JellyioConfig.refreshStatus();
-                        Dashboard.hideLoadingMsg();
-                    });
+                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
+                    try {
+                        if (window.Dashboard && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
+                        ApiClient.getPluginConfiguration(JellyioConfig.pluginUniqueId).then(function (config) {
+                            JellyioConfig.config = config;
+                            document.getElementById('AddonUrl').value = config.AddonUrl || "";
+                            document.getElementById('ExtraQuery').value = config.ExtraQuery || "";
+                            document.getElementById('OutputPath').value = config.OutputPath || "";
+                            document.getElementById('EnabledCatalogIds').value = config.EnabledCatalogIds || "";
+                            document.getElementById('MaxItemsPerCatalog').value = config.MaxItemsPerCatalog || 20;
+                            document.getElementById('MaxStreamsPerTitle').value = config.MaxStreamsPerTitle || 5;
+                            document.getElementById('MaxEpisodesPerSeries').value = config.MaxEpisodesPerSeries || 0;
+                            document.getElementById('RefreshIntervalHours').value = config.RefreshIntervalHours || 0;
+                            document.getElementById('SyncEpisodes').checked = config.SyncEpisodes !== false;
+                            JellyioConfig.refreshStatus();
+                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                        }).catch(function (err) {
+                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                            JellyioConfig.showError("Failed to load plugin config: " + (err && err.message ? err.message : err));
+                        });
+                    } catch (err) {
+                        JellyioConfig.showError("Failed to load plugin config: " + (err && err.message ? err.message : err));
+                    }
                 },
 
                 save: function () {
-                    var config = JellyioConfig.config;
-                    if (!config) { return; }
-                    config.AddonUrl = document.getElementById('AddonUrl').value;
-                    config.ExtraQuery = document.getElementById('ExtraQuery').value;
-                    config.OutputPath = document.getElementById('OutputPath').value;
-                    config.EnabledCatalogIds = document.getElementById('EnabledCatalogIds').value;
-                    config.MaxItemsPerCatalog = parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0;
-                    config.MaxStreamsPerTitle = parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0;
-                    config.MaxEpisodesPerSeries = parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0;
-                    config.RefreshIntervalHours = parseInt(document.getElementById('RefreshIntervalHours').value) || 0;
-                    config.SyncEpisodes = document.getElementById('SyncEpisodes').checked;
+                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
+                    // Build the config from the form directly so Save always works,
+                    // even if the initial config load failed.
+                    var config = {
+                        AddonUrl: document.getElementById('AddonUrl').value,
+                        ExtraQuery: document.getElementById('ExtraQuery').value,
+                        OutputPath: document.getElementById('OutputPath').value,
+                        EnabledCatalogIds: document.getElementById('EnabledCatalogIds').value,
+                        MaxItemsPerCatalog: parseInt(document.getElementById('MaxItemsPerCatalog').value) || 0,
+                        MaxStreamsPerTitle: parseInt(document.getElementById('MaxStreamsPerTitle').value) || 0,
+                        MaxEpisodesPerSeries: parseInt(document.getElementById('MaxEpisodesPerSeries').value) || 0,
+                        RefreshIntervalHours: parseInt(document.getElementById('RefreshIntervalHours').value) || 0,
+                        SyncEpisodes: document.getElementById('SyncEpisodes').checked
+                    };
+                    if (JellyioConfig.config && JellyioConfig.config.LastFingerprint) {
+                        config.LastFingerprint = JellyioConfig.config.LastFingerprint;
+                    }
 
                     ApiClient.updatePluginConfiguration(JellyioConfig.pluginUniqueId, config).then(function () {
                         var msg = document.getElementById('saveMessage');
                         msg.textContent = "Saved.";
                         setTimeout(function () { msg.textContent = ""; }, 3000);
+                    }).catch(function (err) {
+                        JellyioConfig.showError("Save failed: " + (err && err.message ? err.message : err));
                     });
                 },
 
                 testConnection: function () {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Manifest')).then(function (manifest) {
-                        Dashboard.hideLoadingMsg();
-                        var catalogs = (manifest.Catalogs || []).map(function (c) {
-                            return c.Type + " / " + c.Id;
-                        }).join(", ");
-                        document.getElementById('connectionResult').textContent =
-                            "Connected to " + manifest.Name + " v" + manifest.Version +
-                            (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)");
-                    }).catch(function (err) {
-                        Dashboard.hideLoadingMsg();
-                        document.getElementById('connectionResult').textContent =
-                            "Connection failed: " + (err && err.message ? err.message : err);
-                    });
+                    if (!window.ApiClient) { JellyioConfig.showError("ApiClient is not available in this page."); return; }
+                    try {
+                        if (window.Dashboard && Dashboard.showLoadingMsg) { Dashboard.showLoadingMsg(); }
+                        ApiClient.getJSON(ApiClient.getUrl('AIOStreams/Manifest')).then(function (manifest) {
+                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                            var catalogs = (manifest.Catalogs || []).map(function (c) {
+                                return c.Type + " / " + c.Id;
+                            }).join(", ");
+                            document.getElementById('connectionResult').textContent =
+                                "Connected to " + manifest.Name + " v" + manifest.Version +
+                                (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)");
+                        }).catch(function (err) {
+                            if (window.Dashboard && Dashboard.hideLoadingMsg) { Dashboard.hideLoadingMsg(); }
+                            JellyioConfig.showError("Connection failed: " + (err && err.message ? err.message : err));
+                        });
+                    } catch (err) {
+                        JellyioConfig.showError("Connection failed: " + (err && err.message ? err.message : err));
+                    }
                 },
 
                 syncNow: function () {
@@ -310,6 +338,9 @@
 
             // The page is injected into an already-loaded document, so DOMContentLoaded never fires.
             // Initialize immediately; fall back to the pageshow event the view manager dispatches.
+            window.addEventListener('error', function (event) {
+                JellyioConfig.showError("Page error: " + (event && event.message ? event.message : "unknown"));
+            });
             JellyioConfig.init();
             document.addEventListener('pageshow', JellyioConfig.init);
         </script>
