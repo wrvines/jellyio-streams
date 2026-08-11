@@ -124,42 +124,42 @@ public class AIOStreamsController : ControllerBase
         {
             var (addonUrl, extraQuery) = RequireConnection();
 
-        if (string.IsNullOrWhiteSpace(term))
-        {
-            return BadRequest("A search term is required.");
-        }
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                return BadRequest("A search term is required.");
+            }
 
-        var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
-        if (manifest is null)
-        {
-            return BadRequest("Could not fetch the AIOStreams manifest.");
-        }
+            var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
+            if (manifest is null)
+            {
+                return BadRequest("Could not fetch the AIOStreams manifest.");
+            }
 
-        var searchCatalog = (manifest.Catalogs ?? [])
-            .FirstOrDefault(c => string.Equals(c.Type, type, StringComparison.OrdinalIgnoreCase)
-                && c.Id?.Contains("search", StringComparison.OrdinalIgnoreCase) == true);
+            var searchCatalog = (manifest.Catalogs ?? [])
+                .FirstOrDefault(c => string.Equals(c.Type, type, StringComparison.OrdinalIgnoreCase)
+                    && c.Id?.Contains("search", StringComparison.OrdinalIgnoreCase) == true);
 
-        if (searchCatalog is null)
-        {
-            return Ok(Array.Empty<MetaPreview>());
-        }
+            if (searchCatalog is null)
+            {
+                return Ok(Array.Empty<MetaPreview>());
+            }
 
-        var response = await _client.GetCatalogAsync(
-                addonUrl,
-                extraQuery,
-                type,
-                searchCatalog.Id!,
-                0,
-                Math.Clamp(limit, 1, 100),
-                term,
-                cancellationToken)
-            .ConfigureAwait(false);
+            var response = await _client.GetCatalogAsync(
+                    addonUrl,
+                    extraQuery,
+                    type,
+                    searchCatalog.Id!,
+                    0,
+                    Math.Clamp(limit, 1, 100),
+                    term,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        var results = (response?.Metas ?? [])
-            .Where(m => !string.Equals(m.Type, "error", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+            var results = (response?.Metas ?? [])
+                .Where(m => !string.Equals(m.Type, "error", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-        return Ok(results);
+            return Ok(results);
         }
         catch (InvalidOperationException ex)
         {

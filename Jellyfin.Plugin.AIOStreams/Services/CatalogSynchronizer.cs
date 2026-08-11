@@ -274,7 +274,7 @@ public sealed class CatalogSynchronizer
         SyncResult result,
         CancellationToken cancellationToken)
     {
-        var limit = config.MaxItemsPerCatalog > 0 ? config.MaxItemsPerCatalog : 50;
+        var limit = config.MaxItemsPerCatalog;
 
         var page = await _client.GetCatalogAsync(
                 config.AddonUrl,
@@ -534,14 +534,23 @@ public sealed class CatalogSynchronizer
             return string.Empty;
         }
 
-        var parts = new List<string>();
+        using var sha = SHA256.Create();
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal))
         {
-            parts.Add(Path.GetRelativePath(root, file));
-            parts.Add(File.ReadAllText(file));
+            var relativePath = Path.GetRelativePath(root, file);
+            var pathBytes = Encoding.UTF8.GetBytes(relativePath + "\n");
+            sha.TransformBlock(pathBytes, 0, pathBytes.Length, null, 0);
+
+            using var stream = File.OpenRead(file);
+            var buffer = new byte[8192];
+            int read;
+            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                sha.TransformBlock(buffer, 0, read, null, 0);
+            }
         }
 
-        var bytes = Encoding.UTF8.GetBytes(string.Join("\n", parts));
-        return Convert.ToHexString(SHA256.HashData(bytes));
+        sha.TransformFinalBlock([], 0, 0);
+        return Convert.ToHexString(sha.Hash ?? []);
     }
 }
