@@ -38,15 +38,21 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     /// <summary>
     /// Gets the resolved output path, honoring a custom override from the configuration.
+    /// Relative paths are resolved against the Jellyfin data directory.
     /// </summary>
     public string ResolvedOutputPath
     {
         get
         {
             var configured = Configuration.OutputPath?.Trim();
-            return string.IsNullOrEmpty(configured)
-                ? DefaultOutputPath
-                : Path.GetFullPath(configured);
+            if (string.IsNullOrEmpty(configured))
+            {
+                return DefaultOutputPath;
+            }
+
+            return Path.IsPathRooted(configured)
+                ? Path.GetFullPath(configured)
+                : Path.GetFullPath(Path.Combine(ApplicationPaths.DataPath, configured));
         }
     }
 

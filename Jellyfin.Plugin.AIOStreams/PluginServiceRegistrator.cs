@@ -12,10 +12,12 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
+        var version = typeof(PluginServiceRegistrator).Assembly.GetName().Version?.ToString(3) ?? "1.0";
+
         serviceCollection.AddHttpClient<AIOStreamsClient>(client =>
         {
             client.Timeout = TimeSpan.FromMinutes(2);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin.Plugin.AIOStreams/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"Jellyfin.Plugin.AIOStreams/{version}");
         });
 
         serviceCollection.AddSingleton<CatalogSynchronizer>();

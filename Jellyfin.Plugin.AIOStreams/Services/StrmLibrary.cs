@@ -22,6 +22,11 @@ public static class StrmLibrary
     /// </summary>
     public static void Wipe(string root)
     {
+        if (string.IsNullOrWhiteSpace(root) || !Path.IsPathRooted(root))
+        {
+            throw new ArgumentException("A rooted, non-empty output path is required.", nameof(root));
+        }
+
         foreach (var dir in new[] { Path.Combine(root, MoviesDirName), Path.Combine(root, ShowsDirName) })
         {
             if (Directory.Exists(dir))
@@ -36,7 +41,7 @@ public static class StrmLibrary
     /// primary version; the rest become bracketed "versions" Jellyfin groups under the same movie.
     /// </summary>
     /// <returns>The relative paths of all written files.</returns>
-    public static IReadOnlyList<string> WriteMovie(
+    public static async Task<IReadOnlyList<string>> WriteMovieAsync(
         string root,
         string title,
         string? year,
@@ -59,12 +64,12 @@ public static class StrmLibrary
             baseName = MakeUnique(baseName, usedNames);
 
             var strmPath = Path.Combine(dir, baseName + ".strm");
-            File.WriteAllText(strmPath, streams[i].Url);
+            await File.WriteAllTextAsync(strmPath, streams[i].Url, cancellationToken).ConfigureAwait(false);
             written.Add(Relative(root, strmPath));
         }
 
         var nfoPath = Path.Combine(dir, "movie.nfo");
-        File.WriteAllText(nfoPath, BuildMovieNfo(title, year, imdbId));
+        await File.WriteAllTextAsync(nfoPath, BuildMovieNfo(title, year, imdbId), cancellationToken).ConfigureAwait(false);
         written.Add(Relative(root, nfoPath));
 
         return written;
@@ -74,7 +79,7 @@ public static class StrmLibrary
     /// Writes the tvshow.nfo plus one STRM per episode/stream for a series.
     /// </summary>
     /// <returns>The relative paths of all written files.</returns>
-    public static IReadOnlyList<string> WriteShow(
+    public static async Task<IReadOnlyList<string>> WriteShowAsync(
         string root,
         string title,
         string? year,
@@ -89,7 +94,7 @@ public static class StrmLibrary
         var written = new List<string>();
 
         var nfoPath = Path.Combine(showDir, "tvshow.nfo");
-        File.WriteAllText(nfoPath, BuildTvShowNfo(title, year, imdbId));
+        await File.WriteAllTextAsync(nfoPath, BuildTvShowNfo(title, year, imdbId), cancellationToken).ConfigureAwait(false);
         written.Add(Relative(root, nfoPath));
 
         foreach (var episode in episodes)
@@ -108,7 +113,7 @@ public static class StrmLibrary
                 baseName = MakeUnique(baseName, usedNames);
 
                 var strmPath = Path.Combine(seasonDir, baseName + ".strm");
-                File.WriteAllText(strmPath, episode.Streams[i].Url);
+                await File.WriteAllTextAsync(strmPath, episode.Streams[i].Url, cancellationToken).ConfigureAwait(false);
                 written.Add(Relative(root, strmPath));
             }
         }

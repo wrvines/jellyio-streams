@@ -138,24 +138,56 @@ public sealed class AIOStreamsClient
     /// <summary>
     /// Turns a user supplied install URL into a base URL + query suffix.
     /// Accepts ".../manifest.json", a bare install path ("https://host/stremio/&lt;uuid&gt;/&lt;token&gt;") or the instance root.
+    /// Preserves any query string already present in the URL and merges it with <paramref name="extraQuery"/>.
     /// </summary>
     private static (string BaseUrl, string Query) Normalize(string addonUrl, string? extraQuery)
     {
-        var url = addonUrl.Trim().TrimEnd('/');
+        var raw = addonUrl.Trim();
 
         const string manifestSuffix = "/manifest.json";
-        if (url.EndsWith(manifestSuffix, StringComparison.OrdinalIgnoreCase))
+        if (raw.EndsWith(manifestSuffix, StringComparison.OrdinalIgnoreCase))
         {
-            url = url[..^manifestSuffix.Length].TrimEnd('/');
+            raw = raw[..^manifestSuffix.Length];
+        }
+        else
+        {
+            var idx = raw.IndexOf(manifestSuffix, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                raw = raw[..idx] + raw[(idx + manifestSuffix.Length)..];
+            }
         }
 
-        var query = string.Empty;
+        string baseUrl;
+        string existingQuery;
+        var queryIndex = raw.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            baseUrl = raw[..queryIndex].TrimEnd('/');
+            existingQuery = raw[queryIndex..];
+            existingQuery = existingQuery.StartsWith('?') ? existingQuery[1..] : string.Empty;
+        }
+        else
+        {
+            baseUrl = raw.TrimEnd('/');
+            existingQuery = string.Empty;
+        }
+
+        var extra = string.Empty;
         if (!string.IsNullOrWhiteSpace(extraQuery))
         {
-            var extra = extraQuery.Trim();
-            query = extra.StartsWith('?') ? extra : "?" + extra;
+            extra = extraQuery.Trim();
+            if (extra.StartsWith('?'))
+            {
+                extra = extra[1..];
+            }
         }
 
-        return (url, query);
+        var merged = string.IsNullOrEmpty(existingQuery)
+            ? extra
+            : string.IsNullOrEmpty(extra) ? existingQuery : existingQuery + "&" + extra;
+
+        var query = string.IsNullOrEmpty(merged) ? string.Empty : "?" + merged;
+        return (baseUrl, query);
     }
 }

@@ -69,10 +69,14 @@ public sealed class LibraryListing
 /// REST endpoints for the plugin (manifest info, search, stream listing, add/sync/status).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = "RequiresElevation")]
 [Route("AIOStreams")]
 public class AIOStreamsController : ControllerBase
 {
+    private static readonly System.Text.RegularExpressions.Regex _yearInFolderRegex = new(
+        @"^(.*?)(?:\s*\((\d{4})\))?\s*$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
     private readonly AIOStreamsClient _client;
     private readonly CatalogSynchronizer _synchronizer;
     private readonly ILogger<AIOStreamsController> _logger;
@@ -254,7 +258,7 @@ public class AIOStreamsController : ControllerBase
     /// Returns the current sync status and the result of the last operation.
     /// </summary>
     [HttpGet("Status")]
-    public ActionResult<SyncStatus> GetStatusAsync()
+    public ActionResult<SyncStatus> GetStatus()
     {
         var status = _synchronizer.GetStatus();
         status.PluginVersion = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString();
@@ -300,7 +304,7 @@ public class AIOStreamsController : ControllerBase
 
             var year = (string?)null;
             var name = folderName;
-            var match = System.Text.RegularExpressions.Regex.Match(folderName, @"^(.*?)(?:\s*\((\d{4})\))?$");
+            var match = _yearInFolderRegex.Match(folderName);
             if (match.Success)
             {
                 name = match.Groups[1].Value.Trim();

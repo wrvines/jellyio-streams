@@ -115,7 +115,33 @@ public sealed class CatalogSynchronizer
         _logger = logger;
     }
 
-    public SyncStatus GetStatus() => _status;
+    public SyncStatus GetStatus()
+    {
+        return new SyncStatus
+        {
+            IsSyncing = _status.IsSyncing,
+            LastStartedAt = _status.LastStartedAt,
+            LastCompletedAt = _status.LastCompletedAt,
+            LastError = _status.LastError,
+            LastResult = _status.LastResult is null
+                ? null
+                : new SyncResult
+                {
+                    StartedAt = _status.LastResult.StartedAt,
+                    CompletedAt = _status.LastResult.CompletedAt,
+                    Movies = _status.LastResult.Movies,
+                    Shows = _status.LastResult.Shows,
+                    Episodes = _status.LastResult.Episodes,
+                    Streams = _status.LastResult.Streams,
+                    Files = _status.LastResult.Files,
+                    Skipped = _status.LastResult.Skipped,
+                    LibraryScanTriggered = _status.LastResult.LibraryScanTriggered,
+                    Fingerprint = _status.LastResult.Fingerprint
+                },
+            ProgressMessage = _status.ProgressMessage,
+            PercentComplete = _status.PercentComplete
+        };
+    }
 
     /// <summary>
     /// Full sync: wipes the managed folders and rebuilds them from the configured catalogs.
@@ -232,7 +258,7 @@ public sealed class CatalogSynchronizer
 
                 if (episodes.Count > 0)
                 {
-                    var files = StrmLibrary.WriteShow(root, title, StrmLibrary.ExtractYear(releaseInfo), StrmLibrary.ExtractImdbId(request.Id), episodes, cancellationToken);
+                    var files = await StrmLibrary.WriteShowAsync(root, title, StrmLibrary.ExtractYear(releaseInfo), StrmLibrary.ExtractImdbId(request.Id), episodes, cancellationToken).ConfigureAwait(false);
                     result.Shows++;
                     result.Episodes += episodes.Count;
                     result.Streams += files.Count(f => f.EndsWith(".strm", StringComparison.OrdinalIgnoreCase));
@@ -247,7 +273,7 @@ public sealed class CatalogSynchronizer
                     throw new InvalidOperationException("No playable streams were found for this title.");
                 }
 
-                var files = StrmLibrary.WriteMovie(root, title, StrmLibrary.ExtractYear(releaseInfo), StrmLibrary.ExtractImdbId(request.Id), streams, cancellationToken);
+                var files = await StrmLibrary.WriteMovieAsync(root, title, StrmLibrary.ExtractYear(releaseInfo), StrmLibrary.ExtractImdbId(request.Id), streams, cancellationToken).ConfigureAwait(false);
                 result.Movies++;
                 result.Streams += streams.Count;
                 result.Files += files.Count;
@@ -323,13 +349,13 @@ public sealed class CatalogSynchronizer
             return;
         }
 
-        var files = StrmLibrary.WriteMovie(
+        var files = await StrmLibrary.WriteMovieAsync(
             root,
             item.Name!,
             StrmLibrary.ExtractYear(item.ReleaseInfo),
             StrmLibrary.ExtractImdbId(item.Id),
             streams,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         result.Movies++;
         result.Streams += streams.Count;
@@ -384,13 +410,13 @@ public sealed class CatalogSynchronizer
             return;
         }
 
-        var files = StrmLibrary.WriteShow(
+        var files = await StrmLibrary.WriteShowAsync(
             root,
             meta?.Name ?? item.Name!,
             StrmLibrary.ExtractYear(meta?.ReleaseInfo ?? item.ReleaseInfo),
             StrmLibrary.ExtractImdbId(item.Id),
             groups,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         result.Shows++;
         result.Episodes += groups.Count;
@@ -429,8 +455,9 @@ public sealed class CatalogSynchronizer
             .Select(g => g.First())
             .ToList();
 
-        var max = maxStreamsOverride ?? (config.MaxStreamsPerTitle > 0 ? config.MaxStreamsPerTitle : int.MaxValue);
-        max = Math.Max(1, max);
+        var max = maxStreamsOverride is > 0
+            ? maxStreamsOverride.Value
+            : (config.MaxStreamsPerTitle > 0 ? config.MaxStreamsPerTitle : int.MaxValue);
 
         var result = new List<StreamFile>();
         for (var i = 0; i < withUrl.Count && result.Count < max; i++)
@@ -498,7 +525,7 @@ public sealed class CatalogSynchronizer
         _status.ProgressMessage = null;
         _status.PercentComplete = 100;
 
-        var fingerprint = ComputeFingerprint(Plugin.Instance!.ResolvedOutputPath);
+        var fingerprint = ComputeFingerprint(Plugin.Instance!.ResolvedOutputPath, _logger);
         result.Fingerprint = fingerprint;
 
         var config = Plugin.Instance.Configuration;
@@ -526,8 +553,9 @@ public sealed class CatalogSynchronizer
 
     /// <summary>
     /// Computes a stable hash of the current managed file tree (relative path + content).
+    /// Files that cannot be read are skipped and logged rather than aborting the sync.
     /// </summary>
-    private static string ComputeFingerprint(string root)
+    private static string ComputeFingerprint(string root, ILogger logger)
     {
         if (!Directory.Exists(root))
         {
@@ -537,16 +565,27 @@ public sealed class CatalogSynchronizer
         using var sha = SHA256.Create();
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal))
         {
-            var relativePath = Path.GetRelativePath(root, file);
-            var pathBytes = Encoding.UTF8.GetBytes(relativePath + "\n");
-            sha.TransformBlock(pathBytes, 0, pathBytes.Length, null, 0);
-
-            using var stream = File.OpenRead(file);
-            var buffer = new byte[8192];
-            int read;
-            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+            try
             {
-                sha.TransformBlock(buffer, 0, read, null, 0);
+                var relativePath = Path.GetRelativePath(root, file);
+                var pathBytes = Encoding.UTF8.GetBytes(relativePath + "\n");
+                sha.TransformBlock(pathBytes, 0, pathBytes.Length, null, 0);
+
+                using var stream = File.OpenRead(file);
+                var buffer = new byte[8192];
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    sha.TransformBlock(buffer, 0, read, null, 0);
+                }
+            }
+            catch (IOException ex)
+            {
+                logger.LogWarning(ex, "Skipping unreadable file while computing fingerprint: {File}", file);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                logger.LogWarning(ex, "Skipping inaccessible file while computing fingerprint: {File}", file);
             }
         }
 
