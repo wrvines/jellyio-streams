@@ -8,8 +8,7 @@ namespace Jellyfin.Plugin.AIOStreams.Configuration;
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
-    /// Gets or sets the AIOStreams addon URL.
-    /// Accepts "https://host", "https://host/stremio/&lt;uuid&gt;/&lt;token&gt;" or a full ".../manifest.json" URL.
+    /// Gets or sets the AIOStreams install URL.
     /// </summary>
     public string AddonUrl { get; set; } = string.Empty;
 
@@ -19,44 +18,27 @@ public class PluginConfiguration : BasePluginConfiguration
     public string ExtraQuery { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the folder that will hold the generated .strm files.
-    /// Add this folder (or its Movies/Shows subfolders) as a Jellyfin library.
-    /// Empty means the default folder under the Jellyfin data directory.
+    /// Gets or sets a value indicating whether the plugin may create /data/stream itself when missing.
     /// </summary>
-    public string OutputPath { get; set; } = string.Empty;
+    public bool AutoCreateStreamFolder { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets catalog ids (comma separated) to sync. Empty = all movie/series catalogs from the manifest.
+    /// Gets or sets a value indicating whether the search UI shows a quality picker when adding.
     /// </summary>
-    public string EnabledCatalogIds { get; set; } = string.Empty;
+    public bool QualityPickerAtAdd { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum number of titles fetched per catalog. Zero = unlimited.
+    /// Gets or sets the preferred quality when the picker is off ("auto", "2160p", "1080p", "720p").
     /// </summary>
-    public int MaxItemsPerCatalog { get; set; } = 20;
+    public string DefaultQuality { get; set; } = "auto";
 
     /// <summary>
-    /// Gets or sets the maximum number of streams written per title (as Jellyfin "versions"). Zero = all streams.
+    /// Gets or sets the maximum number of streams shown in the quality picker.
     /// </summary>
-    public int MaxStreamsPerTitle { get; set; } = 5;
+    public int MaxStreamsShown { get; set; } = 10;
 
     /// <summary>
-    /// Gets or sets a value indicating whether episodes of series are resolved and written.
+    /// Gets or sets the HMAC secret used to sign playback tokens. Generated automatically; never displayed.
     /// </summary>
-    public bool SyncEpisodes { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the maximum number of episodes resolved per series (most recent first). Zero = all episodes.
-    /// </summary>
-    public int MaxEpisodesPerSeries { get; set; } = 0;
-
-    /// <summary>
-    /// Gets or sets the scheduled refresh interval in hours. Zero = manual refresh only.
-    /// </summary>
-    public int RefreshIntervalHours { get; set; } = 6;
-
-    /// <summary>
-    /// Gets or sets the fingerprint of the last successful sync. Used to skip library rescans when nothing changed.
-    /// </summary>
-    public string LastFingerprint { get; set; } = string.Empty;
+    public string PlaybackSecret { get; set; } = string.Empty;
 }
