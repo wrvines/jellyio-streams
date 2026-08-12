@@ -8,19 +8,16 @@
         .jellyio-field label { display: block; margin-bottom: 0.25em; font-weight: 600; }
         .jellyio-field input[type="text"],
         .jellyio-field input[type="number"],
-        .jellyio-field select {
+        .jellyio-field select,
+        .jellyio-field textarea {
             width: 100%; max-width: 36em; padding: 0.4em 0.6em;
             border: 1px solid #555; border-radius: 4px; background: #151515; color: #ddd;
         }
+        .jellyio-field textarea { font-family: Consolas, Menlo, monospace; }
         .jellyio-hint { color: #999; font-size: 0.9em; margin-top: 0.2em; }
         .jellyio-result { color: #bbb; font-size: 0.92em; white-space: pre-wrap; }
+        .jellyio-statusRow { display: flex; align-items: center; gap: 0.8em; margin-top: 0.5em; }
         .jellyio-actions button { margin: 0.3em 0.6em 0.3em 0; padding: 0.5em 1.1em; cursor: pointer; }
-        .jellyio-searchrow { display: flex; flex-wrap: wrap; gap: 0.6em; align-items: flex-end; }
-        .jellyio-searchrow .jellyio-field { margin: 0; }
-        .jellyio-resultItem { display: flex; align-items: center; gap: 0.8em; margin: 0.5em 0; padding: 0.5em; border: 1px solid #333; border-radius: 4px; }
-        .jellyio-resultItem img { width: 4em; height: 6em; object-fit: cover; }
-        .jellyio-resultItem .jellyio-resultBody { flex: 1; }
-        .jellyio-resultItem .jellyio-resultBody strong { display: block; }
     </style>
 </head>
 <body>
@@ -48,65 +45,44 @@
             </div>
             <div class="connectionResult jellyio-result"></div>
 
-            <div class="jellyio-section">Library</div>
+            <div class="jellyio-section">Streaming</div>
             <div class="jellyio-field">
-                <label for="OutputPath">Output folder</label>
-                <input type="text" id="OutputPath" class="fldOutputPath" />
-                <div class="jellyio-hint">Folder where the .strm files are generated. Add it as a Jellyfin library of type "Mixed Movies and Shows". Leave empty for the default folder.</div>
+                <label><input type="checkbox" id="AutoCreateStreamFolder" class="fldAutoCreateStreamFolder" checked="checked" style="width:auto;" /> Auto-create the /data/stream folder</label>
+                <div class="jellyio-hint">The plugin creates the required stream folder (with its "movies" and "tv" subfolders) on startup when it is missing.</div>
             </div>
             <div class="jellyio-field">
-                <label for="EnabledCatalogIds">Catalog ids</label>
-                <input type="text" id="EnabledCatalogIds" class="fldEnabledCatalogIds" placeholder="trending-movie,top-shows" />
-                <div class="jellyio-hint">Comma separated catalog ids (listed by "Test connection"). Empty = all movie/series catalogs.</div>
+                <label><input type="checkbox" id="QualityPickerAtAdd" class="fldQualityPickerAtAdd" style="width:auto;" /> Show a quality picker when adding titles</label>
+                <div class="jellyio-hint">Lets you choose the quality of each title when adding it from the search page.</div>
             </div>
             <div class="jellyio-field">
-                <label for="MaxItemsPerCatalog">Titles per catalog</label>
-                <input type="number" id="MaxItemsPerCatalog" class="fldMaxItemsPerCatalog" />
+                <label for="DefaultQuality">Default quality</label>
+                <select id="DefaultQuality" class="fldDefaultQuality">
+                    <option value="auto">auto</option>
+                    <option value="2160p">2160p</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                </select>
+                <div class="jellyio-hint">Preferred quality when the picker is off.</div>
             </div>
             <div class="jellyio-field">
-                <label for="MaxStreamsPerTitle">Streams per title</label>
-                <input type="number" id="MaxStreamsPerTitle" class="fldMaxStreamsPerTitle" />
-                <div class="jellyio-hint">Each stream becomes a selectable "version" in Jellyfin. Zero = all streams.</div>
-            </div>
-            <div class="jellyio-field">
-                <label for="MaxEpisodesPerSeries">Episodes per series</label>
-                <input type="number" id="MaxEpisodesPerSeries" class="fldMaxEpisodesPerSeries" />
-                <div class="jellyio-hint">Only the most recent episodes are resolved when set. Zero = all episodes.</div>
-            </div>
-            <div class="jellyio-field">
-                <label for="RefreshIntervalHours">Auto refresh interval (hours)</label>
-                <input type="number" id="RefreshIntervalHours" class="fldRefreshIntervalHours" />
-                <div class="jellyio-hint">Zero = manual only. Restart Jellyfin after changing this value.</div>
-            </div>
-            <div class="jellyio-field">
-                <label><input type="checkbox" id="SyncEpisodes" class="fldSyncEpisodes" checked="checked" style="width:auto;" /> Resolve episodes of series</label>
+                <label for="MaxStreamsShown">Max streams shown in picker</label>
+                <input type="number" id="MaxStreamsShown" class="fldMaxStreamsShown" min="1" />
+                <div class="jellyio-hint">Maximum number of streams listed in the quality picker. Zero = server default.</div>
             </div>
 
-            <div class="jellyio-section">Actions</div>
-            <div class="jellyio-actions">
-                <button type="button" class="btnSync" style="padding:0.5em 1.1em; cursor:pointer;">Sync now</button>
-            </div>
-            <div class="syncResult jellyio-result"></div>
-
-            <div class="jellyio-section">Search &amp; add</div>
-            <div class="jellyio-searchrow">
-                <div class="jellyio-field">
-                    <label for="searchType">Type</label>
-                    <select id="searchType" class="fldSearchType">
-                        <option value="movie">Movie</option>
-                        <option value="series">Series</option>
-                    </select>
-                </div>
-                <div class="jellyio-field" style="flex:1 1 18em;">
-                    <label for="searchTerm">Search AIOStreams</label>
-                    <input type="text" id="searchTerm" class="fldSearchTerm" />
-                </div>
-                <button type="button" class="btnSearch" style="padding:0.5em 1.1em; cursor:pointer;">Search</button>
-            </div>
-            <div class="searchResults jellyio-result"></div>
-
-            <div class="jellyio-section">Status</div>
+            <div class="jellyio-section">Setup status</div>
             <div class="statusBox jellyio-result"></div>
+
+            <div class="jellyio-section">Web UI hook</div>
+            <div class="jellyio-field">
+                <label for="HookSnippet">Search-box hook snippet</label>
+                <textarea id="HookSnippet" class="fldHookSnippet" rows="2" readonly="readonly">&lt;script src="/AIOStreams/WebUI/hook.js"&gt;&lt;/script&gt;</textarea>
+                <div class="jellyio-hint">Adds a "Search AIOStreams" entry to Jellyfin's search results. Three steps: open Dashboard &rarr; General &rarr; Custom JavaScript, paste the snippet, then Save.</div>
+                <div class="jellyio-actions">
+                    <button type="button" class="btnCopyHook" style="padding:0.5em 1.1em; cursor:pointer;">Copy</button>
+                    <span class="copyHookResult jellyio-result"></span>
+                </div>
+            </div>
         </div>
 
         <script type="text/javascript">
@@ -204,13 +180,14 @@
 
                     this.el(".fldAddonUrl").value = value("AddonUrl", "");
                     this.el(".fldExtraQuery").value = value("ExtraQuery", "");
-                    this.el(".fldOutputPath").value = value("OutputPath", "");
-                    this.el(".fldEnabledCatalogIds").value = value("EnabledCatalogIds", "");
-                    this.el(".fldMaxItemsPerCatalog").value = value("MaxItemsPerCatalog", 20);
-                    this.el(".fldMaxStreamsPerTitle").value = value("MaxStreamsPerTitle", 5);
-                    this.el(".fldMaxEpisodesPerSeries").value = value("MaxEpisodesPerSeries", 0);
-                    this.el(".fldRefreshIntervalHours").value = value("RefreshIntervalHours", 0);
-                    this.el(".fldSyncEpisodes").checked = value("SyncEpisodes", true) !== false;
+                    this.el(".fldAutoCreateStreamFolder").checked = value("AutoCreateStreamFolder", true) !== false;
+                    this.el(".fldQualityPickerAtAdd").checked = value("QualityPickerAtAdd", false) === true;
+
+                    var quality = value("DefaultQuality", "auto");
+                    var select = this.el(".fldDefaultQuality");
+                    select.value = ["auto", "2160p", "1080p", "720p"].indexOf(quality) >= 0 ? quality : "auto";
+
+                    this.el(".fldMaxStreamsShown").value = value("MaxStreamsShown", 10);
                 };
 
                 Controller.prototype.load = function () {
@@ -231,24 +208,21 @@
                 // Jellyfin deserializes the posted configuration with a case-sensitive serializer
                 // (no naming policy), so the property names must be PascalCase.
                 Controller.prototype.readForm = function () {
-                    var number = function (selector) {
-                        return parseInt(this.el(selector).value, 10) || 0;
-                    }.bind(this);
-
                     var config = {
                         AddonUrl: this.el(".fldAddonUrl").value.trim(),
                         ExtraQuery: this.el(".fldExtraQuery").value.trim(),
-                        OutputPath: this.el(".fldOutputPath").value.trim(),
-                        EnabledCatalogIds: this.el(".fldEnabledCatalogIds").value.trim(),
-                        MaxItemsPerCatalog: number(".fldMaxItemsPerCatalog"),
-                        MaxStreamsPerTitle: number(".fldMaxStreamsPerTitle"),
-                        MaxEpisodesPerSeries: number(".fldMaxEpisodesPerSeries"),
-                        RefreshIntervalHours: number(".fldRefreshIntervalHours"),
-                        SyncEpisodes: this.el(".fldSyncEpisodes").checked
+                        AutoCreateStreamFolder: this.el(".fldAutoCreateStreamFolder").checked,
+                        QualityPickerAtAdd: this.el(".fldQualityPickerAtAdd").checked,
+                        DefaultQuality: this.el(".fldDefaultQuality").value,
+                        MaxStreamsShown: parseInt(this.el(".fldMaxStreamsShown").value, 10) || 0
                     };
 
-                    var fingerprint = pick(this.loadedConfig, "LastFingerprint");
-                    if (fingerprint) { config.LastFingerprint = fingerprint; }
+                    // PlaybackSecret is generated by the server and is never rendered anywhere on
+                    // this page. The config endpoint resets properties that are absent from the
+                    // POST, which would invalidate every issued playback token, so the stored
+                    // value is echoed back untouched.
+                    var secret = pick(this.loadedConfig, "PlaybackSecret");
+                    if (secret) { config.PlaybackSecret = secret; }
                     return config;
                 };
 
@@ -338,185 +312,111 @@
                     if (!window.ApiClient) { this.showError("ApiClient is not available in this page."); return; }
 
                     loading(true);
-                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Manifest")).then(function (manifest) {
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
                         loading(false);
-                        var catalogs = (pick(manifest, "Catalogs") || []).map(function (c) {
-                            return pick(c, "Type") + " / " + pick(c, "Id");
-                        }).join(", ");
-
-                        self.setText(".connectionResult", "Connected to " + pick(manifest, "Name") +
-                            " v" + pick(manifest, "Version") +
-                            (catalogs ? ". Catalogs: " + catalogs : " (no catalogs - user config may be required)"));
+                        var name = pick(status, "AddonName");
+                        if (!pick(status, "AddonUrlConfigured")) {
+                            self.setText(".connectionResult", "No addon URL is configured. Enter it above and save.");
+                        } else if (name) {
+                            self.setText(".connectionResult", "Connected to " + name + ".");
+                        } else {
+                            self.setText(".connectionResult", "Connected, but the addon did not report a name. Check the URL and the Jellyfin logs.");
+                        }
                     }).catch(function (err) {
                         loading(false);
                         self.showHttpError("Connection failed:", err);
                     });
                 };
 
-                Controller.prototype.syncNow = function () {
-                    var self = this;
-                    var btn = this.el(".btnSync");
-                    if (btn.disabled) { return; }
-                    btn.disabled = true;
-                    btn.textContent = "Syncing…";
-                    this.setText(".syncResult", "Sync started…");
-
-                    var start = Date.now();
-                    var pollTimer = null;
-                    var stopPoll = function () {
-                        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-                    };
-
-                    // While the sync request is running, poll the status endpoint so the user
-                    // sees live progress instead of a spinner that looks hung.
-                    var poll = function () {
-                        ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
-                            if (pick(status, "IsSyncing")) {
-                                var elapsed = Math.round((Date.now() - start) / 1000);
-                                var message = pick(status, "ProgressMessage") || "";
-                                var pct = pick(status, "PercentComplete");
-                                var line = "Syncing… " + elapsed + "s";
-                                if (typeof pct === "number" && pct >= 0) { line += " (" + Math.round(pct) + "%)"; }
-                                if (message) { line += " — " + message; }
-                                self.setText(".syncResult", line);
-                            }
-                        }).catch(function () { /* transient; keep polling */ });
-                    };
-                    pollTimer = setInterval(poll, 2000);
-                    loading(true);
-
-                    ApiClient.ajax({
-                        type: "POST",
-                        url: ApiClient.getUrl("AIOStreams/Sync"),
-                        dataType: "json"
-                    }).then(function (result) {
-                        stopPoll();
-                        loading(false);
-                        btn.disabled = false;
-                        btn.textContent = "Sync now";
-                        var seconds = (new Date(pick(result, "CompletedAt")) - new Date(pick(result, "StartedAt"))) / 1000;
-                        self.setText(".syncResult", "Done in " + (isFinite(seconds) ? seconds.toFixed(1) : "?") + "s - " +
-                            pick(result, "Movies") + " movies, " + pick(result, "Shows") + " shows, " +
-                            pick(result, "Episodes") + " episodes, " + pick(result, "Streams") + " streams (" +
-                            pick(result, "Files") + " files written), " + pick(result, "Skipped") + " skipped." +
-                            (pick(result, "LibraryScanTriggered") ? " Library scan triggered." : ""));
-                        self.refreshStatus();
-                    }).catch(function (err) {
-                        stopPoll();
-                        loading(false);
-                        btn.disabled = false;
-                        btn.textContent = "Sync now";
-                        self.showHttpError("Sync failed:", err);
-                    });
-                };
-
                 Controller.prototype.refreshStatus = function () {
                     var self = this;
+                    if (!window.ApiClient) { return; }
                     ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
                         var version = pick(status, "PluginVersion");
                         var configured = pick(status, "AddonUrlConfigured");
-                        var configLine = "Server: plugin " + (version || "?") + " · addon URL " +
-                            (configured ? "configured" : "NOT configured");
-                        var last = pick(status, "LastResult");
-                        if (pick(status, "IsSyncing")) {
-                            self.setText(".statusBox", "A sync is currently running…\n" + configLine);
-                        } else if (pick(status, "LastError")) {
-                            self.setText(".statusBox", "Last run failed: " + pick(status, "LastError") + "\n" + configLine);
-                        } else if (last) {
-                            self.setText(".statusBox", "Last run: " + [
-                                pick(last, "Movies") + " movies",
-                                pick(last, "Shows") + " shows",
-                                pick(last, "Episodes") + " episodes",
-                                pick(last, "Streams") + " streams",
-                                pick(last, "Files") + " files",
-                                pick(last, "Skipped") + " skipped"
-                            ].join(", ") + ".\n" + configLine);
-                        } else {
-                            self.setText(".statusBox", "No sync has run yet. Configure the addon URL, then press \"Sync now\".\n" + configLine);
+                        var folderState = pick(status, "FolderState") || "";
+                        var root = pick(status, "StreamRoot") || "/data/stream";
+
+                        var stateLabel = folderState === "Ok" ? "ready" :
+                            folderState === "Missing" ? "missing" :
+                            folderState === "NotDirectory" ? "not a directory" :
+                            folderState === "NotWritable" ? "not writable" : folderState || "unknown";
+
+                        var html = "";
+                        html += "<div>Plugin version: <strong>" + escapeHtml(version || "?") + "</strong></div>";
+                        html += "<div>Addon: <strong>" + (configured
+                            ? escapeHtml(pick(status, "AddonName") || "(name unknown)")
+                            : "(not configured)") + "</strong></div>";
+                        html += "<div>Stream folder <code>" + escapeHtml(root) + "</code>: <strong>" + escapeHtml(stateLabel) + "</strong></div>";
+
+                        if (folderState === "Missing") {
+                            html += '<div class="jellyio-statusRow">' +
+                                '<button type="button" class="btnCreateFolder" style="padding:0.5em 1.1em; cursor:pointer;">Create now</button>' +
+                                '<span class="createFolderResult jellyio-result"></span></div>';
+                        } else if (folderState === "NotDirectory" || folderState === "NotWritable") {
+                            html += '<div class="jellyio-hint">The folder exists but is not usable. Fix it on the server (e.g. a docker bind mount) and save the settings to re-check.</div>';
                         }
+
+                        var box = self.el(".statusBox");
+                        box.innerHTML = html;
+                        var create = box.querySelector(".btnCreateFolder");
+                        if (create) { create.addEventListener("click", function () { self.createFolder(create); }); }
                     }).catch(function (err) {
                         self.showHttpError("Failed to read status:", err);
                     });
                 };
 
-                Controller.prototype.search = function () {
+                Controller.prototype.createFolder = function (btn) {
                     var self = this;
-                    var term = this.el(".fldSearchTerm").value;
-                    var type = this.el(".fldSearchType").value;
-                    if (!term) { return; }
-
-                    loading(true);
-                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Search", { term: term, type: type, limit: 20 })).then(function (results) {
-                        loading(false);
-                        var container = self.el(".searchResults");
-                        var html = "";
-
-                        (results || []).forEach(function (item) {
-                            var poster = pick(item, "Poster");
-                            var description = pick(item, "Description");
-                            html += '<div class="jellyio-resultItem">';
-                            if (poster) { html += '<img src="' + escapeHtml(poster) + '" />'; }
-                            html += '<div class="jellyio-resultBody">';
-                            html += "<strong>" + escapeHtml(pick(item, "Name")) + "</strong>";
-                            html += "<span>" + escapeHtml(pick(item, "ReleaseInfo") || "") +
-                                (description ? " - " + escapeHtml(String(description).slice(0, 140)) : "") + "</span>";
-                            html += "</div>";
-                            html += '<button type="button" data-id="' + escapeHtml(pick(item, "Id")) +
-                                '" data-name="' + escapeHtml(pick(item, "Name")) +
-                                '" data-type="' + escapeHtml(pick(item, "Type")) +
-                                '" data-release="' + escapeHtml(pick(item, "ReleaseInfo") || "") + '">Add</button>';
-                            html += "</div>";
-                        });
-
-                        container.innerHTML = html || "<div>No results.</div>";
-                        container.querySelectorAll("button[data-id]").forEach(function (btn) {
-                            btn.addEventListener("click", function () { self.addTitle(btn); });
-                        });
+                    if (!window.ApiClient) { return; }
+                    btn.disabled = true;
+                    btn.textContent = "Creating…";
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/CreateFolder"),
+                        contentType: "application/json",
+                        dataType: "json"
+                    }).then(function () {
+                        self.refreshStatus();
                     }).catch(function (err) {
-                        loading(false);
-                        self.showHttpError("Search failed:", err);
+                        btn.disabled = false;
+                        btn.textContent = "Create now";
+                        self.showHttpError("Failed to create the stream folder:", err);
                     });
                 };
 
-                Controller.prototype.addTitle = function (btn) {
+                Controller.prototype.copyHook = function () {
                     var self = this;
-                    loading(true);
-                    ApiClient.ajax({
-                        type: "POST",
-                        url: ApiClient.getUrl("AIOStreams/Add"),
-                        data: JSON.stringify({
-                            type: btn.getAttribute("data-type") || "movie",
-                            id: btn.getAttribute("data-id"),
-                            name: btn.getAttribute("data-name"),
-                            releaseInfo: btn.getAttribute("data-release")
-                        }),
-                        contentType: "application/json",
-                        dataType: "json"
-                    }).then(function (result) {
-                        loading(false);
-                        self.setText(".syncResult", "Added: " + [
-                            pick(result, "Movies") + " movies",
-                            pick(result, "Shows") + " shows",
-                            pick(result, "Episodes") + " episodes",
-                            pick(result, "Streams") + " streams",
-                            pick(result, "Files") + " files"
-                        ].join(", ") + ".");
-                        btn.textContent = "Done";
-                    }).catch(function (err) {
-                        loading(false);
-                        self.showHttpError("Add failed:", err);
-                    });
+                    var textarea = this.el(".fldHookSnippet");
+                    var done = function () {
+                        var btn = self.el(".btnCopyHook");
+                        if (btn) { btn.textContent = "Copied"; }
+                        self.setText(".copyHookResult", "Copied.");
+                        setTimeout(function () {
+                            if (btn) { btn.textContent = "Copy"; }
+                            self.setText(".copyHookResult", "");
+                        }, 2000);
+                    };
+                    var fallback = function () {
+                        try {
+                            textarea.focus();
+                            textarea.select();
+                            if (document.execCommand("copy")) { done(); return; }
+                        } catch (e) { /* fall through to the manual hint */ }
+                        self.setText(".copyHookResult", "Copy failed - select the snippet manually and press Ctrl+C.");
+                    };
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(textarea.value).then(done).catch(fallback);
+                    } else {
+                        fallback();
+                    }
                 };
 
                 Controller.prototype.bind = function () {
                     var self = this;
                     this.el(".btnSave").addEventListener("click", function () { self.save(); });
                     this.el(".btnTestConnection").addEventListener("click", function () { self.testConnection(); });
-                    this.el(".btnSync").addEventListener("click", function () { self.syncNow(); });
-                    this.el(".btnSearch").addEventListener("click", function () { self.search(); });
-                    this.el(".fldSearchTerm").addEventListener("keypress", function (e) {
-                        if (e.key === "Enter") { self.search(); }
-                    });
+                    this.el(".btnCopyHook").addEventListener("click", function () { self.copyHook(); });
                 };
 
                 function init(page) {
