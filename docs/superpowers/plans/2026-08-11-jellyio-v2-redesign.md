@@ -2125,12 +2125,17 @@ public class AIOStreamsController : ControllerBase
     {
         var assembly = typeof(AIOStreamsController).Assembly;
         var resource = $"{assembly.GetName().Name}.Web.hook.js";
-        using var stream = assembly.GetManifestResourceStream(resource);
+        var stream = assembly.GetManifestResourceStream(resource);
         if (stream is null)
         {
             return NotFound();
         }
 
+        HttpContext.Response.OnCompleted(() =>
+        {
+            stream.Dispose();
+            return Task.CompletedTask;
+        });
         return File(stream, "text/javascript", enableRangeProcessing: false);
     }
 
@@ -2141,7 +2146,12 @@ public class AIOStreamsController : ControllerBase
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             var origin = new Uri(url).GetLeftPart(UriPartial.Authority);
             request.Headers.Referrer = new Uri(origin);
-            using var response = await _client.SendPlaybackAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await _client.SendPlaybackAsync(request, cancellationToken).ConfigureAwait(false);
+            HttpContext.Response.OnCompleted(() =>
+            {
+                response.Dispose();
+                return Task.CompletedTask;
+            });
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Playback proxy failed: {Url} -> {Status}", url, (int)response.StatusCode);
