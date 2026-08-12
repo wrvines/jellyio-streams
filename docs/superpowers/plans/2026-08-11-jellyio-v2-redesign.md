@@ -50,7 +50,6 @@
 **Delete:**
 - `Jellyfin.Plugin.AIOStreams/Services/CatalogSynchronizer.cs`
 - `Jellyfin.Plugin.AIOStreams/Services/StrmLibrary.cs`
-- `Jellyfin.Plugin.AIOStreams/Services/StreamModels.cs`
 - `Jellyfin.Plugin.AIOStreams/Tasks/RefreshTask.cs`
 
 **Unchanged:** `Services/AIOStreamsClient.cs`, `Services/StremioModels.cs`.
@@ -951,8 +950,6 @@ git commit -m "feat: /data/stream validation and TRaSH path building"
 **Files:**
 - Create: `Jellyfin.Plugin.AIOStreams/Services/OnDemandLibrary.cs`
 - Create: `tests/Jellyfin.Plugin.AIOStreams.Tests/OnDemandLibraryTests.cs`
-- Delete: `Jellyfin.Plugin.AIOStreams/Services/StreamModels.cs`
-
 **Interfaces:**
 - Consumes: `StreamFolder` (Task 4) for paths/names.
 - Produces:
@@ -1245,11 +1242,8 @@ public static partial class OnDemandLibrary
 }
 ```
 
-Then delete the obsolete file:
-
-```bash
-git rm Jellyfin.Plugin.AIOStreams/Services/StreamModels.cs
-```
+The obsolete `StreamModels.cs` is NOT deleted in this task — `StrmLibrary.cs` and
+`CatalogSynchronizer.cs` still reference its types until Task 8 deletes them together.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -2178,7 +2172,7 @@ The proxy path needs a raw playback GET on the shared client. Add to `Services/A
 - [ ] **Step 3: Delete obsolete services**
 
 ```bash
-git rm Jellyfin.Plugin.AIOStreams/Services/CatalogSynchronizer.cs Jellyfin.Plugin.AIOStreams/Services/StrmLibrary.cs
+git rm Jellyfin.Plugin.AIOStreams/Services/CatalogSynchronizer.cs Jellyfin.Plugin.AIOStreams/Services/StrmLibrary.cs Jellyfin.Plugin.AIOStreams/Services/StreamModels.cs
 ```
 
 - [ ] **Step 4: Build to verify compilation**
