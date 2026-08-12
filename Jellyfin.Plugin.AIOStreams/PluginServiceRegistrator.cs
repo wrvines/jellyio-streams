@@ -20,6 +20,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             client.DefaultRequestHeaders.UserAgent.ParseAdd($"Jellyfin.Plugin.AIOStreams/{version}");
         });
 
-        serviceCollection.AddSingleton<CatalogSynchronizer>();
+        serviceCollection.AddSingleton<OnDemandService>();
     }
 }

@@ -1,25 +1,28 @@
 # Jellyio Streams
 
-Stream content from a self-hosted [AIOStreams](https://github.com/Viren070/AIOStreams) instance in Jellyfin.
-The plugin queries AIOStreams (Stremio addon protocol), then generates `.strm` files plus `.nfo` metadata into a
-folder you add as a regular Jellyfin library — giving you native Jellyfin browsing, search, every client app,
-and a Stremio-like **stream picker** (each stream becomes a selectable "version" of the item).
+Stream content from a self-hosted [AIOStreams](https://github.com/Viren070/AIOStreams) instance in Jellyfin —
+a Stremio-like **on-demand** experience: search AIOStreams from Jellyfin, add a title, and it appears in your
+library within seconds.
+
+The plugin writes a signed `.strm` file (plus `.nfo` metadata) for every added title/episode into a required
+`/data/stream` folder. At playback time the plugin re-resolves a **fresh stream** from AIOStreams and redirects
+(or proxies) to it, so playback works in every Jellyfin client and expired debrid links are bypassed.
 
 ## How it feels
 
-- The generated library behaves like a normal Jellyfin library: home-screen rows, global search, resume, etc.
-- Each title has **one item with multiple versions** — one per stream AIOStreams found
-  (e.g. `2160p HDR10+`, `1080p WEB-DL`, ...). Choosing a version is Stremio's "pick a stream".
-- Playback uses the URL from AIOStreams directly (debrid / usenet direct links or AIOStreams' built-in proxy);
-  Jellyfin direct-plays it or transcodes it as needed.
-- **Search & add**: use the plugin's dashboard page to search AIOStreams and add any title on demand,
-  without waiting for a full catalog sync.
+- **Search & add** from the **Jellyio Streams** page in the dashboard sidebar: no catalog sync, no waiting —
+  your library only contains what you add.
+- Added titles land in a normal Jellyfin library (see Setup), so home-screen rows, resume, and every
+  client app work as usual.
+- At playback the plugin picks the best available stream automatically, or lets you choose a quality
+  when the quality picker is enabled.
+- Movies are single items; series are added episode-by-episode with their season/episode numbers.
 
 ## Requirements
 
 - Jellyfin server 10.11 (net9.0)
 - A self-hosted AIOStreams instance with at least one debrid/usenet service configured, and a saved
-  **user config** (you need the per-user install URL — catalogs are only available with a user config).
+  **user config** (you need the per-user install URL — streams are only available with a user config).
 
 ## Install
 
@@ -41,37 +44,58 @@ Requires the .NET 9 SDK. `Jellyfin.Controller` / `Jellyfin.Model` packages are r
 
 ## Setup
 
-1. **Get your AIOStreams install URL** — open your instance's "Save & Install" page and copy the addon URL
-   (it looks like `https://<host>/stremio/<uuid>/<token>` or ends in `/manifest.json`). Your debrid keys and
-   filtering rules live in that user config, so all results inherit them.
-2. **Configure the plugin** (Dashboard → Plugins → AIOStreams → Settings):
-   - Paste the addon URL.
-   - Choose the output folder (default: `<jellyfin data dir>/aiostreams`).
-   - Tune: titles per catalog, streams per title, episodes per series, auto-refresh interval.
-3. **Press "Test connection"** — you should see the addon name and its catalogs.
-4. **Press "Sync now"** (or run the *Refresh AIOStreams library* scheduled task).
-5. **Create a Jellyfin library** pointing at the output folder with content type
-   **"Mixed Movies and Shows"** (or add `Movies` and `Shows` as two libraries).
-   Jellyfin scans the generated `.strm` files, fetches artwork/metadata via the IMDb ids in the nfo files,
-   and groups streams into versions.
+1. **Create the stream folder** — the plugin writes to `/data/stream` (TRaSH layout). Either create it
+   yourself (`mkdir /data/stream` on the Jellyfin host) or leave **Auto-create stream folder** enabled
+   in the plugin settings and the plugin will create it on demand.
+2. **Add the library** — in Jellyfin, add a library named e.g. `Stream` of type **Mixed Movies and Shows**
+   pointing at `/data/stream`.
+3. **Configure the plugin** (Dashboard → Plugins → Jellyio Streams → Settings):
+   - Paste your AIOStreams **install URL** (from your instance's "Save & Install" page — it looks like
+     `https://<host>/stremio/<uuid>/<token>`). Your debrid keys and filtering rules live in that user
+     config, so all results inherit them.
+   - Optional: enable the quality picker and set a default quality.
+4. **Search & add** — open the **Jellyio Streams** page in the dashboard sidebar, search for a movie or
+   series, and press **Add**. The title appears in your library within seconds.
 
-### Search & add
+### Optional: in-library search (Custom JS hook)
 
-On the plugin settings page, use the **Search & add** box to find any title through AIOStreams' search catalog
-and add it immediately — useful when you want something specific without waiting for the next sync.
+To surface "Search AIOStreams" directly inside Jellyfin's own search results, enable Jellyfin's
+Custom JavaScript feature and paste this one-line snippet:
 
-### API
+```html
+<script src="/AIOStreams/WebUI/hook.js"></script>
+```
 
-The plugin exposes a small JSON API (same origin, Jellyfin-authenticated):
+Three steps: open **Dashboard → General → Custom JavaScript**, paste the snippet, then **Save**.
+When Jellyfin's library search returns nothing (or when you're browsing the `Stream` library), the hook
+adds a "Search AIOStreams" entry that jumps into the plugin's search page.
+
+## Stream behavior
+
+- **Auto best / quality picker** — with the picker off (default), the plugin automatically selects the
+  best-ranked stream for the configured default quality. Enable **Quality picker when adding** to choose
+  the exact quality for each title as you add it.
+- **Fresh streams at playback, expired-link fallback** — `.strm` files contain a signed token, not a
+  cached stream URL. When you press play, the plugin re-resolves the stream from AIOStreams at that
+  moment, so expired debrid links never get stuck in the library.
+- **Header proxy** — streams that need custom request headers (`notWebReady`) are proxied through the
+  plugin instead of being redirected, so they still play.
+
+## API
+
+The plugin exposes a small JSON API (same origin, Jellyfin-authenticated except where noted):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/AIOStreams/Manifest` | Addon manifest (name, version, catalogs) |
-| GET | `/AIOStreams/Search?term=…&type=movie\|series` | Search the addon's search catalog |
-| GET | `/AIOStreams/Streams?type=movie\|series&id=…` | Resolved playable streams for a title/episode |
-| POST | `/AIOStreams/Add` `{type,id,name?,releaseInfo?,maxStreams?}` | Add one title to the library |
-| POST | `/AIOStreams/Sync` | Run a full catalog sync |
-| GET | `/AIOStreams/Status` | Last sync result / running state |
+| GET | `/AIOStreams/Status` | Plugin status: version, addon URL configured, `/data/stream` state |
+| GET | `/AIOStreams/Search?term=…&type=movie\|series&limit=…` | Search the addon's search catalog |
+| GET | `/AIOStreams/Streams?type=movie\|series&id=…&max=…` | Resolved playable streams, ranked best first |
+| POST | `/AIOStreams/Add` `{type,id,name?,releaseInfo?,quality?}` | Add one title to the library |
+| POST | `/AIOStreams/Remove` `{type,title,year?}` | Remove a title from the library |
+| GET | `/AIOStreams/Library` | Titles currently on disk in `/data/stream` |
+| POST | `/AIOStreams/CreateFolder` | Create `/data/stream` (the "Create now" button) |
+| GET | `/AIOStreams/Stream?token=…` | Playback: validates the signed token, resolves a fresh stream, redirects or proxies *(unauthenticated)* |
+| GET | `/AIOStreams/WebUI/hook.js` | The Custom JS hook script *(unauthenticated)* |
 
 ## Configuration reference
 
@@ -79,30 +103,29 @@ The plugin exposes a small JSON API (same origin, Jellyfin-authenticated):
 | --- | --- | --- |
 | AddonUrl | – | AIOStreams install URL (see Setup) |
 | ExtraQuery | – | Extra query params appended to every addon request |
-| OutputPath | `…/aiostreams` | Folder that holds the generated `.strm` library |
-| EnabledCatalogIds | all | Comma-separated catalog ids; empty = all movie/series catalogs |
-| MaxItemsPerCatalog | 20 | Titles fetched per catalog during sync (0 = unlimited) |
-| MaxStreamsPerTitle | 5 | Versions per title (0 = all streams) |
-| SyncEpisodes | true | Resolve series episodes during sync |
-| MaxEpisodesPerSeries | 0 | Only the newest N episodes per series (0 = all) |
-| RefreshIntervalHours | 6 | Auto refresh trigger (0 = manual only; restart Jellyfin after changing) |
+| AutoCreateStreamFolder | true | Create `/data/stream` automatically when it is missing |
+| QualityPickerAtAdd | false | Show a quality picker in the search UI when adding |
+| DefaultQuality | auto | Preferred quality when the picker is off (`auto`, `2160p`, `1080p`, `720p`) |
+| MaxStreamsShown | 10 | Maximum streams listed in the quality picker (0 = server default) |
+| PlaybackSecret | (generated) | HMAC secret that signs playback tokens; generated automatically, never displayed |
 
 ## Notes & limitations
 
-- Only streams with a direct `url` are written. Torrent results without a debrid service (infoHash only)
-  can't be played by Jellyfin and are skipped — configure debrid in AIOStreams.
-- If a stream URL requires custom request headers (some debrid setups), direct playback may fail; prefer
-  routing streams through AIOStreams' built-in proxy or [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy).
-- Anime items without an IMDb id keep their native id (e.g. `kitsu:…`); Jellyfin may not fetch artwork for
-  those, but playback works.
-- Episodes resolve through the addon's meta resource (`meta` resource must be available).
+- **Playback URL** — when you add a title, the plugin records the Jellyfin address of the *request*.
+  If you later change your Jellyfin host (hostname, port, or protocol), re-add the title so the `.strm`
+  files point at the new address.
+- The **search page is web-only** (dashboard sidebar); playback itself works on every Jellyfin client.
+- Only streams with a direct `url` are playable. Torrent results without a debrid service (infoHash
+  only) can't be played and are skipped — configure debrid in AIOStreams.
+- Anime items without an IMDb id keep their native id (e.g. `kitsu:…`); Jellyfin may not fetch artwork
+  for those, but playback works.
 - Subtitles from AIOStreams are not yet attached to items (future work).
 
 ## Roadmap
 
 - Subtitle support
-- Web app UI (search + stream picker) served by the plugin
 - Per-user configs (multiple AIOStreams user configs → per-user libraries)
+- Catalog browsing (browse addon catalogs directly from the search page)
 
 ## License
 

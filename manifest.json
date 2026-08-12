@@ -1,12 +1,20 @@
 [
   {
     "name": "Jellyio Streams",
-    "description": "Stream Stremio-addon content from your self-hosted AIOStreams instance. The plugin generates a Jellyfin library (.strm files plus nfo metadata) with a Stremio-like stream picker: each resolved stream becomes a selectable version of the item. Includes catalog sync, search & add, and a scheduled refresh task.",
+    "description": "Stream Stremio-addon content from your self-hosted AIOStreams instance. On-demand: search & add from Jellyfin, with signed redirect playback — a fresh stream is resolved on every play, so it works on all clients. Generated .strm library lives in the required /data/stream folder (TRaSH layout).",
     "overview": "Stream Stremio-addon content from a self-hosted AIOStreams instance",
     "owner": "wrvines",
     "category": "Metadata",
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
+      {
+        "version": "2.0.0.0",
+        "changelog": "v2: on-demand search & add; signed playback redirect (fresh streams, works on all clients); required /data/stream folder (TRaSH layout); optional in-library search via Custom JS hook.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/wrvines/jellyio-streams/releases/download/v2.0.0.0/jellyio-streams_2.0.0.0.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-08-12T00:00:00Z"
+      },
       {
         "version": "1.0.4.0",
         "changelog": "Security: plugin API endpoints now require admin elevation (RequiresElevation policy). Fix: MaxStreams=0 override now means use default/unlimited instead of being forced to 1. Fix: addon URLs that already contain query strings are preserved and merged with ExtraQuery. Fix: GetStatus now returns a copy of the sync status to prevent external mutation. Fix: STRM and NFO writes are now async instead of blocking thread-pool threads. Fix: ComputeFingerprint no longer crashes the sync when a file is locked or unreadable. Fix: StrmLibrary.Wipe now rejects empty or unrooted paths. Improvement: HTTP User-Agent now reports the actual plugin version. Improvement: relative OutputPath values are resolved against the Jellyfin data directory.",
