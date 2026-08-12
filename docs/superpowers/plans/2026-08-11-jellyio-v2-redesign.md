@@ -1815,6 +1815,7 @@ git commit -m "feat: on-demand add/remove/search orchestration service"
 ```csharp
 using Jellyfin.Plugin.AIOStreams.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -2026,8 +2027,14 @@ public class AIOStreamsController : ControllerBase
     [HttpGet("Library")]
     public ActionResult<LibraryListing> GetLibrary()
     {
-        var root = Plugin.Instance?.StreamRoot;
-        if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+        var plugin = Plugin.Instance;
+        if (plugin is null)
+        {
+            return Ok(new LibraryListing());
+        }
+
+        var root = Plugin.StreamRoot;
+        if (!Directory.Exists(root))
         {
             return Ok(new LibraryListing());
         }
@@ -2045,11 +2052,13 @@ public class AIOStreamsController : ControllerBase
     [HttpPost("CreateFolder")]
     public ActionResult<string> CreateFolder()
     {
-        var root = Plugin.Instance?.StreamRoot;
-        if (string.IsNullOrEmpty(root))
+        var plugin = Plugin.Instance;
+        if (plugin is null)
         {
             return BadRequest("Plugin is not loaded.");
         }
+
+        var root = Plugin.StreamRoot;
 
         StreamFolder.Create(root);
         return Ok(StreamFolder.Validate(root).ToString());
