@@ -16,6 +16,8 @@
     <EmbeddedResource Include="Configuration\configPage.html" />
     <None Remove="Web\searchPage.html" />
     <EmbeddedResource Include="Web\searchPage.html" />
+    <None Remove="Web\hook.js" />
+    <EmbeddedResource Include="Web\hook.js" />
   </ItemGroup>
 
   <ItemGroup>
