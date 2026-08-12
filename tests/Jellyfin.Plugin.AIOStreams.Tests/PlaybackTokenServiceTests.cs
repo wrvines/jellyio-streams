@@ -35,7 +35,7 @@ public class PlaybackTokenServiceTests
     {
         var service = NewService();
         var token = service.IssueToken("movie", "tt1234567", "auto");
-        var tampered = token[..^1] + (token[^1] == 'A' ? 'B' : 'A');
+        var tampered = token[..^2] + (token[^2] == 'A' ? 'B' : 'A') + token[^1];
         Assert.False(service.TryVerify(tampered, out _));
     }
 

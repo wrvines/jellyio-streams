@@ -108,6 +108,7 @@ public sealed class OnDemandService
                 Title = stream.Title,
                 Name = stream.Name,
                 Description = stream.Description,
+                Quality = StreamResolver.ResolveQuality(stream.Title + " " + stream.Name),
                 NotWebReady = stream.BehaviorHints?.NotWebReady
             });
         }

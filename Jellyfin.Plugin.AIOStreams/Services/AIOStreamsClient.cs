@@ -37,7 +37,7 @@ public sealed class AIOStreamsClient
         var manifest = await GetJsonAsync<AddonManifest>(url, cancellationToken).ConfigureAwait(false);
         if (manifest is not null)
         {
-            _logger.LogDebug("Manifest loaded from {Url}: {Name} {Version}", url, manifest.Name, manifest.Version);
+            _logger.LogDebug("Manifest loaded from {Url}: {Name} {Version}", Redact(url), manifest.Name, manifest.Version);
         }
 
         return manifest;
@@ -123,7 +123,7 @@ public sealed class AIOStreamsClient
             using var response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("AIOStreams request failed: {Url} -> {Status}", url, (int)response.StatusCode);
+                _logger.LogWarning("AIOStreams request failed: {Url} -> {Status}", Redact(url), (int)response.StatusCode);
                 return null;
             }
 
@@ -136,9 +136,24 @@ public sealed class AIOStreamsClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "AIOStreams request error: {Url}", url);
+            _logger.LogWarning(ex, "AIOStreams request error: {Url}", Redact(url));
             return null;
         }
+    }
+
+    /// <summary>
+    /// Masks a URL for logging: keeps only scheme://host and replaces any path/query
+    /// beyond it with a fixed-length marker so embedded credentials never reach the logs.
+    /// </summary>
+    private static string Redact(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return "<invalid>";
+        }
+
+        var origin = uri.GetLeftPart(UriPartial.Authority);
+        return uri.AbsolutePath.Length > 1 || uri.Query.Length > 0 ? origin + "/***" : origin;
     }
 
     /// <summary>

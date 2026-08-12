@@ -6,7 +6,7 @@ library within seconds.
 
 The plugin writes a signed `.strm` file (plus `.nfo` metadata) for every added title/episode into a required
 `/data/stream` folder. At playback time the plugin re-resolves a **fresh stream** from AIOStreams and redirects
-(or proxies) to it, so playback works in every Jellyfin client and expired debrid links are bypassed.
+(or proxies) to it, so playback works in every Jellyfin client and stream URLs are never cached in the library.
 
 ## How it feels
 
@@ -75,9 +75,12 @@ adds a "Search AIOStreams" entry that jumps into the plugin's search page.
 - **Auto best / quality picker** — with the picker off (default), the plugin automatically selects the
   best-ranked stream for the configured default quality. Enable **Quality picker when adding** to choose
   the exact quality for each title as you add it.
-- **Fresh streams at playback, expired-link fallback** — `.strm` files contain a signed token, not a
-  cached stream URL. When you press play, the plugin re-resolves the stream from AIOStreams at that
-  moment, so expired debrid links never get stuck in the library.
+- **Fresh streams at playback** — `.strm` files contain a signed token, not a cached stream URL.
+  When you press play, the plugin re-resolves the stream from AIOStreams at that moment, so a dead
+  debrid link is never baked into your library.
+- **Dead-link fallback (proxied streams)** — proxied (`notWebReady`) streams fall back through the
+  quality-ranked stream list automatically until one responds. Direct (302) streams leave dead-link
+  handling to the client player — the server cannot detect a dead redirect.
 - **Header proxy** — streams that need custom request headers (`notWebReady`) are proxied through the
   plugin instead of being redirected, so they still play.
 

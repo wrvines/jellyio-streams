@@ -243,8 +243,9 @@ public class AIOStreamsController : ControllerBase
 
     /// <summary>
     /// Playback endpoint referenced by generated .strm files. Validates the HMAC token,
-    /// resolves a fresh stream from AIOStreams, then redirects (or proxies when the
-    /// stream needs custom request headers). Unauthenticated by design.
+    /// resolves a fresh stream from AIOStreams, then redirects, or proxies through the
+    /// quality-ranked stream list when the top stream needs custom request headers.
+    /// Unauthenticated by design.
     /// </summary>
     [HttpGet("Stream")]
     [AllowAnonymous]
@@ -272,25 +273,36 @@ public class AIOStreamsController : ControllerBase
 
         var config = plugin.Configuration;
         var response = await _client.GetStreamsAsync(config.AddonUrl, config.ExtraQuery, payload.Type, payload.Id, cancellationToken).ConfigureAwait(false);
-        var streams = (response?.Streams ?? [])
+        var ranked = StreamResolver.Rank((response?.Streams ?? [])
             .Where(s => !string.IsNullOrWhiteSpace(s.Url))
             .GroupBy(s => s.Url, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
+            .Select(g => g.First()));
 
-        var selected = StreamResolver.Select(streams, payload.Quality);
-        if (selected is null)
+        if (ranked.Count == 0)
         {
             _logger.LogWarning("No playable stream found for {Type}/{Id}", payload.Type, payload.Id);
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "No playable stream was found.");
         }
 
-        if (selected.BehaviorHints?.NotWebReady == true)
+        var top = ranked[0];
+        if (top.BehaviorHints?.NotWebReady != true)
         {
-            return await ProxyAsync(selected.Url!, cancellationToken).ConfigureAwait(false);
+            // Direct redirect: dead-link handling is left to the client player —
+            // the server cannot detect a dead redirect target.
+            return Redirect(top.Url!);
         }
 
-        return Redirect(selected.Url!);
+        foreach (var stream in ranked)
+        {
+            var proxied = await TryProxyAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (proxied is not null)
+            {
+                return proxied;
+            }
+        }
+
+        _logger.LogWarning("All playback proxies failed for {Type}/{Id}", payload.Type, payload.Id);
+        return StatusCode(StatusCodes.Status502BadGateway, "The stream source failed to respond.");
     }
 
     /// <summary>
@@ -316,33 +328,52 @@ public class AIOStreamsController : ControllerBase
         return File(stream, "text/javascript", enableRangeProcessing: false);
     }
 
-    private async Task<ActionResult> ProxyAsync(string url, CancellationToken cancellationToken)
+    /// <summary>
+    /// Attempts to proxy one stream. Returns the streamed result on a successful upstream
+    /// response, or null when the upstream failed (non-success status or exception) so the
+    /// caller can fall back to the next ranked stream.
+    /// </summary>
+    private async Task<ActionResult?> TryProxyAsync(StreamResult stream, CancellationToken cancellationToken)
     {
+        var url = stream.Url!;
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             var origin = new Uri(url).GetLeftPart(UriPartial.Authority);
             request.Headers.Referrer = new Uri(origin);
             var response = await _client.SendPlaybackAsync(request, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Playback proxy failed: {Url} -> {Status}", url, (int)response.StatusCode);
+                response.Dispose();
+                return null;
+            }
+
             HttpContext.Response.OnCompleted(() =>
             {
                 response.Dispose();
                 return Task.CompletedTask;
             });
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Playback proxy failed: {Url} -> {Status}", url, (int)response.StatusCode);
-                return StatusCode(StatusCodes.Status502BadGateway, "The stream source failed to respond.");
-            }
 
             var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+            if (response.Content.Headers.ContentLength is { } contentLength)
+            {
+                HttpContext.Response.ContentLength = contentLength;
+            }
+
+            // Proxied streams stream progressively; seek/range requires a caching proxy (out of scope).
             var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            return File(body, contentType, enableRangeProcessing: true);
+            return File(body, contentType, enableRangeProcessing: false);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
             _logger.LogWarning(ex, "Playback proxy failed for {Url}", url);
-            return StatusCode(StatusCodes.Status502BadGateway, "The stream source failed to respond.");
+            return null;
         }
     }
 

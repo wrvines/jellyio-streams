@@ -336,7 +336,7 @@
                             box.appendChild(hint);
                         } else {
                             list.forEach(function (stream) {
-                                addRow(pick(stream, "Label") || "Stream", pick(stream, "Label") || "");
+                                addRow(pick(stream, "Label") || "Stream", pick(stream, "Quality") || null);
                             });
                         }
                         addRow("Best (auto)", null);

@@ -15,5 +15,10 @@ public sealed class ApiStream
 
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Gets or sets the resolved quality family, e.g. "1080p".
+    /// </summary>
+    public string? Quality { get; set; }
+
     public bool? NotWebReady { get; set; }
 }

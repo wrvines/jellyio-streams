@@ -25,18 +25,19 @@ public sealed class PlaybackTokenService
 
     /// <summary>
     /// Initializes a new instance with a base64url-encoded secret (see <see cref="GenerateSecret"/>).
+    /// Tokens are effectively permanent; the secret bounds exposure (rotating it invalidates all issued tokens).
     /// </summary>
     public PlaybackTokenService(string secret, TimeSpan? lifetime = null)
     {
         _key = Base64UrlDecode(secret);
-        _lifetime = lifetime ?? TimeSpan.FromDays(7);
+        _lifetime = lifetime ?? TimeSpan.FromDays(3650);
     }
 
     /// <summary>
     /// Generates a fresh 32-byte base64url secret for the plugin configuration.
     /// </summary>
     public static string GenerateSecret()
-        => Base64Url(Encoding.UTF8.GetBytes(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))), padding: false);
+        => Base64Url(RandomNumberGenerator.GetBytes(32));
 
     /// <summary>
     /// Issues a token: base64url(payloadJson) + "." + base64url(HMAC-SHA256(payloadJson)).
@@ -51,9 +52,9 @@ public sealed class PlaybackTokenService
             e = DateTimeOffset.UtcNow.Add(_lifetime).ToUnixTimeSeconds()
         }, _jsonOptions);
 
-        var payloadB64 = Base64Url(Encoding.UTF8.GetBytes(payload), padding: false);
+        var payloadB64 = Base64Url(Encoding.UTF8.GetBytes(payload));
         var sig = Sign(payload);
-        return payloadB64 + "." + Base64Url(sig, padding: false);
+        return payloadB64 + "." + Base64Url(sig);
     }
 
     /// <summary>
@@ -119,7 +120,7 @@ public sealed class PlaybackTokenService
         return hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
     }
 
-    private static string Base64Url(byte[] bytes, bool padding)
+    private static string Base64Url(byte[] bytes)
         => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static byte[] Base64UrlDecode(string value)
