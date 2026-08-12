@@ -873,7 +873,7 @@ public static partial class StreamFolder
     /// </summary>
     public static string SanitizeTitle(string value)
     {
-        var invalid = Path.GetInvalidFileNameChars();
+        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { ':', '?', '*', '"', '<', '>', '|' }).Distinct().ToArray();
         var sb = new StringBuilder(value.Length);
         foreach (var c in value)
         {
