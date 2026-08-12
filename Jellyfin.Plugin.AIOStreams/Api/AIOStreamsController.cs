@@ -244,7 +244,7 @@ public class AIOStreamsController : ControllerBase
     /// <summary>
     /// Playback endpoint referenced by generated .strm files. Validates the HMAC token,
     /// resolves a fresh stream from AIOStreams, then redirects, or proxies through the
-    /// quality-ranked stream list when the top stream needs custom request headers.
+    /// quality-ranked stream list when the chosen stream needs custom request headers.
     /// Unauthenticated by design.
     /// </summary>
     [HttpGet("Stream")]
@@ -284,12 +284,12 @@ public class AIOStreamsController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "No playable stream was found.");
         }
 
-        var top = ranked[0];
-        if (top.BehaviorHints?.NotWebReady != true)
+        var selected = StreamResolver.Select(ranked, payload.Quality) ?? ranked[0];
+        if (selected.BehaviorHints?.NotWebReady != true)
         {
             // Direct redirect: dead-link handling is left to the client player —
             // the server cannot detect a dead redirect target.
-            return Redirect(top.Url!);
+            return Redirect(selected.Url!);
         }
 
         foreach (var stream in ranked)
