@@ -1,12 +1,20 @@
 [
   {
     "name": "Jellyio Streams",
-    "description": "Stream Stremio-addon content from your self-hosted AIOStreams instance. On-demand: search & add from Jellyfin, with signed redirect playback — a fresh stream is resolved on every play, so it works on all clients. Generated .strm library lives in the required /data/stream folder (TRaSH layout).",
+    "description": "Stream Stremio-addon content from your self-hosted AIOStreams instance. On-demand: search & add from Jellyfin, with signed redirect playback \u2014 a fresh stream is resolved on every play, so it works on all clients. Generated .strm library lives in the required /data/stream folder (TRaSH layout).",
     "overview": "Stream Stremio-addon content from a self-hosted AIOStreams instance",
     "owner": "wrvines",
     "category": "Metadata",
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
+      {
+        "version": "2.0.0.1",
+        "changelog": "v2.0.0.1: serve the plugin zip from jsDelivr (CDN) instead of GitHub release assets to bypass content filters that mangle release downloads.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://cdn.jsdelivr.net/gh/wrvines/jellyio-streams@main/jellyio-streams_2.0.0.1.zip",
+        "checksum": "8BF4DC8F46185F102442D35646723B048A4AF2FCC6F6BD94D2FEEC8D6E22001E",
+        "timestamp": "2026-08-12T12:00:00Z"
+      },
       {
         "version": "2.0.0.0",
         "changelog": "v2: on-demand search & add; signed playback redirect (fresh streams, works on all clients); required /data/stream folder (TRaSH layout); optional in-library search via Custom JS hook.",

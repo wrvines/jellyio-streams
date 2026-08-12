@@ -1,6 +1,6 @@
 name: "Jellyio Streams"
 guid: "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b"
-version: "2.0.0.0"
+version: "2.0.0.1"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "wrvines"
