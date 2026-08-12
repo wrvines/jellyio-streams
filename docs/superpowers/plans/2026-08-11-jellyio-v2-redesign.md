@@ -98,7 +98,8 @@
 
 - [ ] **Step 2: Create a placeholder test**
 
-```csharp
+```csharpusing Xunit;
+
 namespace Jellyfin.Plugin.AIOStreams.Tests;
 
 public class PlaceholderTests
@@ -148,7 +149,8 @@ git commit -m "test: scaffold xunit test project"
 
 - [ ] **Step 1: Write the failing test**
 
-```csharp
+```csharpusing Xunit;
+
 using Jellyfin.Plugin.AIOStreams.Services;
 
 namespace Jellyfin.Plugin.AIOStreams.Tests;
@@ -386,7 +388,8 @@ git commit -m "feat: HMAC playback token service"
 
 - [ ] **Step 1: Write the failing test**
 
-```csharp
+```csharpusing Xunit;
+
 using Jellyfin.Plugin.AIOStreams.Services;
 
 namespace Jellyfin.Plugin.AIOStreams.Tests;
@@ -668,7 +671,8 @@ git commit -m "feat: stream quality ranking and selection"
 
 - [ ] **Step 1: Write the failing test**
 
-```csharp
+```csharpusing Xunit;
+
 using Jellyfin.Plugin.AIOStreams.Services;
 
 namespace Jellyfin.Plugin.AIOStreams.Tests;
@@ -967,7 +971,8 @@ git commit -m "feat: /data/stream validation and TRaSH path building"
 
 - [ ] **Step 1: Write the failing test**
 
-```csharp
+```csharpusing Xunit;
+
 using Jellyfin.Plugin.AIOStreams.Services;
 
 namespace Jellyfin.Plugin.AIOStreams.Tests;
