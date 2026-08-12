@@ -5,3 +5,5 @@ obj/
 .idea/
 .vscode/
 *.zip
+.worktrees/
+.superpowers/
