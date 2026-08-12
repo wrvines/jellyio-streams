@@ -1,117 +1,104 @@
 using Jellyfin.Plugin.AIOStreams.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AIOStreams.Api;
 
 /// <summary>
-/// A stream as exposed to the plugin UI.
+/// Body of the Remove request.
 /// </summary>
-public sealed class ApiStream
-{
-    public string? Url { get; set; }
-
-    public string? Label { get; set; }
-
-    public string? Title { get; set; }
-
-    public string? Name { get; set; }
-
-    public string? Description { get; set; }
-
-    public int? FileIdx { get; set; }
-
-    public bool? NotWebReady { get; set; }
-}
-
-/// <summary>
-/// Body of the Add request.
-/// </summary>
-public sealed class AddTitleRequest
+public sealed class RemoveTitleRequest
 {
     public string Type { get; set; } = "movie";
 
-    public string Id { get; set; } = string.Empty;
-
-    public string? Name { get; set; }
-
-    public string? ReleaseInfo { get; set; }
-
-    public int? MaxStreams { get; set; }
-}
-
-/// <summary>
-/// A title currently on disk in the managed library folder.
-/// </summary>
-public sealed class LibraryTitle
-{
-    public string Name { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
 
     public string? Year { get; set; }
-
-    public string Type { get; set; } = "movie";
 }
 
 /// <summary>
-/// The managed library folder contents.
+/// The managed stream folder contents.
 /// </summary>
 public sealed class LibraryListing
 {
     public string RootPath { get; set; } = string.Empty;
 
-    public IReadOnlyList<LibraryTitle> Movies { get; set; } = [];
-
-    public IReadOnlyList<LibraryTitle> Shows { get; set; } = [];
+    public IReadOnlyList<TitleOnDisk> Titles { get; set; } = [];
 }
 
 /// <summary>
-/// REST endpoints for the plugin (manifest info, search, stream listing, add/sync/status).
+/// Plugin status for the UI.
+/// </summary>
+public sealed class PluginStatus
+{
+    public string PluginVersion { get; set; } = string.Empty;
+
+    public bool AddonUrlConfigured { get; set; }
+
+    public string FolderState { get; set; } = string.Empty;
+
+    public string StreamRoot { get; set; } = string.Empty;
+
+    public bool QualityPickerAtAdd { get; set; }
+
+    public string? AddonName { get; set; }
+}
+
+/// <summary>
+/// REST endpoints for the plugin: status, search, stream listing, add/remove, and the
+/// unauthenticated playback redirect endpoint used by .strm files.
 /// </summary>
 [ApiController]
 [Authorize(Policy = "RequiresElevation")]
 [Route("AIOStreams")]
 public class AIOStreamsController : ControllerBase
 {
-    private static readonly System.Text.RegularExpressions.Regex _yearInFolderRegex = new(
-        @"^(.*?)(?:\s*\((\d{4})\))?\s*$",
-        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
     private readonly AIOStreamsClient _client;
-    private readonly CatalogSynchronizer _synchronizer;
+    private readonly OnDemandService _onDemand;
     private readonly ILogger<AIOStreamsController> _logger;
 
     public AIOStreamsController(
         AIOStreamsClient client,
-        CatalogSynchronizer synchronizer,
+        OnDemandService onDemand,
         ILogger<AIOStreamsController> logger)
     {
         _client = client;
-        _synchronizer = synchronizer;
+        _onDemand = onDemand;
         _logger = logger;
     }
 
     /// <summary>
-    /// Fetches and returns the AIOStreams manifest (name, version, available catalogs).
+    /// Returns plugin status including the /data/stream validation state.
     /// </summary>
-    [HttpGet("Manifest")]
-    public async Task<ActionResult<AddonManifest>> GetManifestAsync(CancellationToken cancellationToken)
+    [HttpGet("Status")]
+    public async Task<ActionResult<PluginStatus>> GetStatusAsync(CancellationToken cancellationToken)
     {
-        try
+        var plugin = Plugin.Instance;
+        if (plugin is null)
         {
-            var (addonUrl, extraQuery) = RequireConnection();
-            var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
-            if (manifest is null)
-            {
-                return BadRequest("Could not fetch the AIOStreams manifest. Check the addon URL.");
-            }
+            return BadRequest("Plugin is not loaded.");
+        }
 
-            return Ok(manifest);
-        }
-        catch (InvalidOperationException ex)
+        var folderState = plugin.EnsureStreamFolder();
+        var config = plugin.Configuration;
+        string? addonName = null;
+        if (!string.IsNullOrWhiteSpace(config.AddonUrl))
         {
-            return BadRequest(ex.Message);
+            var manifest = await _client.GetManifestAsync(config.AddonUrl, config.ExtraQuery, cancellationToken).ConfigureAwait(false);
+            addonName = manifest?.Name;
         }
+
+        return Ok(new PluginStatus
+        {
+            PluginVersion = plugin.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString() ?? "unknown",
+            AddonUrlConfigured = !string.IsNullOrWhiteSpace(config.AddonUrl),
+            FolderState = folderState,
+            StreamRoot = Plugin.StreamRoot,
+            QualityPickerAtAdd = config.QualityPickerAtAdd,
+            AddonName = addonName
+        });
     }
 
     /// <summary>
@@ -119,51 +106,19 @@ public class AIOStreamsController : ControllerBase
     /// </summary>
     [HttpGet("Search")]
     public async Task<ActionResult<IReadOnlyList<MetaPreview>>> SearchAsync(
-        [FromQuery, Microsoft.AspNetCore.Mvc.ModelBinding.BindRequired] string term,
+        [FromQuery] string term,
         [FromQuery] string type = "movie",
         [FromQuery] int limit = 20,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var (addonUrl, extraQuery) = RequireConnection();
-
             if (string.IsNullOrWhiteSpace(term))
             {
                 return BadRequest("A search term is required.");
             }
 
-            var manifest = await _client.GetManifestAsync(addonUrl, extraQuery, cancellationToken).ConfigureAwait(false);
-            if (manifest is null)
-            {
-                return BadRequest("Could not fetch the AIOStreams manifest.");
-            }
-
-            var searchCatalog = (manifest.Catalogs ?? [])
-                .FirstOrDefault(c => string.Equals(c.Type, type, StringComparison.OrdinalIgnoreCase)
-                    && c.Id?.Contains("search", StringComparison.OrdinalIgnoreCase) == true);
-
-            if (searchCatalog is null)
-            {
-                return Ok(Array.Empty<MetaPreview>());
-            }
-
-            var response = await _client.GetCatalogAsync(
-                    addonUrl,
-                    extraQuery,
-                    type,
-                    searchCatalog.Id!,
-                    0,
-                    Math.Clamp(limit, 1, 100),
-                    term,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            var results = (response?.Metas ?? [])
-                .Where(m => !string.Equals(m.Type, "error", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            return Ok(results);
+            return Ok(await _onDemand.SearchAsync(term, type, limit, cancellationToken).ConfigureAwait(false));
         }
         catch (InvalidOperationException ex)
         {
@@ -172,35 +127,24 @@ public class AIOStreamsController : ControllerBase
     }
 
     /// <summary>
-    /// Resolves and returns the playable streams for a title or episode.
+    /// Resolves and returns the playable streams for a title or episode, ranked best first.
     /// </summary>
     [HttpGet("Streams")]
     public async Task<ActionResult<IReadOnlyList<ApiStream>>> GetStreamsAsync(
-        [FromQuery, Microsoft.AspNetCore.Mvc.ModelBinding.BindRequired] string type,
-        [FromQuery, Microsoft.AspNetCore.Mvc.ModelBinding.BindRequired] string id,
+        [FromQuery] string type,
+        [FromQuery] string id,
+        [FromQuery] int? max = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var (addonUrl, extraQuery) = RequireConnection();
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return BadRequest("A title id is required.");
+            }
 
-            var response = await _client.GetStreamsAsync(addonUrl, extraQuery, type, id, cancellationToken).ConfigureAwait(false);
-
-            var streams = (response?.Streams ?? [])
-                .Where(s => !string.IsNullOrWhiteSpace(s.Url))
-                .Select((s, i) => new ApiStream
-                {
-                    Url = s.Url,
-                    Label = s.Title ?? s.Name ?? $"Stream {i + 1}",
-                    Title = s.Title,
-                    Name = s.Name,
-                    Description = s.Description,
-                    FileIdx = s.FileIdx,
-                    NotWebReady = s.BehaviorHints?.NotWebReady
-                })
-                .ToList();
-
-            return Ok(streams);
+            var cap = max is > 0 ? max : Plugin.Instance?.Configuration.MaxStreamsShown;
+            return Ok(await _onDemand.ResolveStreamsAsync(type, id, cap, cancellationToken).ConfigureAwait(false));
         }
         catch (InvalidOperationException ex)
         {
@@ -209,23 +153,27 @@ public class AIOStreamsController : ControllerBase
     }
 
     /// <summary>
-    /// Adds a single title to the library (incremental, does not wipe existing content).
+    /// Adds a title to the stream library (incremental, does not wipe existing content).
     /// </summary>
     [HttpPost("Add")]
-    public async Task<ActionResult<SyncResult>> AddAsync(AddTitleRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AddResult>> AddAsync(TitleAddRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _synchronizer.AddTitleAsync(new SingleTitleRequest
+            var plugin = Plugin.Instance;
+            if (plugin is null)
             {
-                Type = request.Type,
-                Id = request.Id,
-                Name = request.Name,
-                ReleaseInfo = request.ReleaseInfo,
-                MaxStreams = request.MaxStreams
-            }, cancellationToken).ConfigureAwait(false);
+                return BadRequest("Plugin is not loaded.");
+            }
 
-            return Ok(result);
+            var folderState = plugin.EnsureStreamFolder();
+            if (folderState != FolderState.Ok.ToString())
+            {
+                return BadRequest($"The stream folder {Plugin.StreamRoot} is not usable (state: {folderState}). Create it or enable auto-create in the plugin settings.");
+            }
+
+            plugin.EnsurePlaybackSecret();
+            return Ok(await _onDemand.AddTitleAsync(request, BuildPlaybackBaseUrl(), cancellationToken).ConfigureAwait(false));
         }
         catch (InvalidOperationException ex)
         {
@@ -238,15 +186,19 @@ public class AIOStreamsController : ControllerBase
     }
 
     /// <summary>
-    /// Runs a full catalog sync. This may take a while.
+    /// Removes a title's folder from the stream library.
     /// </summary>
-    [HttpPost("Sync")]
-    public async Task<ActionResult<SyncResult>> SyncAsync(CancellationToken cancellationToken)
+    [HttpPost("Remove")]
+    public async Task<ActionResult<bool>> RemoveAsync(RemoveTitleRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _synchronizer.SyncCatalogsAsync(progress: null, cancellationToken).ConfigureAwait(false);
-            return Ok(result);
+            if (string.IsNullOrWhiteSpace(request.Title))
+            {
+                return BadRequest("A title is required.");
+            }
+
+            return Ok(await _onDemand.RemoveTitleAsync(request.Type, request.Title, request.Year, cancellationToken).ConfigureAwait(false));
         }
         catch (InvalidOperationException ex)
         {
@@ -255,24 +207,12 @@ public class AIOStreamsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the current sync status and the result of the last operation.
-    /// </summary>
-    [HttpGet("Status")]
-    public ActionResult<SyncStatus> GetStatus()
-    {
-        var status = _synchronizer.GetStatus();
-        status.PluginVersion = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString();
-        status.AddonUrlConfigured = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.AddonUrl);
-        return Ok(status);
-    }
-
-    /// <summary>
-    /// Lists the titles currently on disk in the managed library folder.
+    /// Lists the titles currently on disk in the stream folder.
     /// </summary>
     [HttpGet("Library")]
-    public ActionResult<LibraryListing> GetLibraryAsync()
+    public ActionResult<LibraryListing> GetLibrary()
     {
-        var root = Plugin.Instance?.ResolvedOutputPath;
+        var root = Plugin.Instance is null ? null : Plugin.StreamRoot;
         if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
         {
             return Ok(new LibraryListing());
@@ -281,55 +221,125 @@ public class AIOStreamsController : ControllerBase
         return Ok(new LibraryListing
         {
             RootPath = root,
-            Movies = ListTitles(Path.Combine(root, StrmLibrary.MoviesDirName), "movie"),
-            Shows = ListTitles(Path.Combine(root, StrmLibrary.ShowsDirName), "series")
+            Titles = OnDemandLibrary.List(root)
         });
     }
 
-    private static IReadOnlyList<LibraryTitle> ListTitles(string dir, string type)
+    /// <summary>
+    /// Creates the /data/stream folder (used by the "Create now" button).
+    /// </summary>
+    [HttpPost("CreateFolder")]
+    public ActionResult<string> CreateFolder()
     {
-        var result = new List<LibraryTitle>();
-        if (!Directory.Exists(dir))
+        var root = Plugin.Instance is null ? null : Plugin.StreamRoot;
+        if (string.IsNullOrEmpty(root))
         {
-            return result;
+            return BadRequest("Plugin is not loaded.");
         }
 
-        foreach (var folder in Directory.EnumerateDirectories(dir).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-        {
-            var folderName = Path.GetFileName(folder);
-            if (string.IsNullOrWhiteSpace(folderName))
-            {
-                continue;
-            }
-
-            var year = (string?)null;
-            var name = folderName;
-            var match = _yearInFolderRegex.Match(folderName);
-            if (match.Success)
-            {
-                name = match.Groups[1].Value.Trim();
-                year = match.Groups[2].Success ? match.Groups[2].Value : null;
-            }
-
-            result.Add(new LibraryTitle { Name = name, Year = year, Type = type });
-        }
-
-        return result;
+        StreamFolder.Create(root);
+        return Ok(StreamFolder.Validate(root).ToString());
     }
 
-    private (string AddonUrl, string? ExtraQuery) RequireConnection()
+    /// <summary>
+    /// Playback endpoint referenced by generated .strm files. Validates the HMAC token,
+    /// resolves a fresh stream from AIOStreams, then redirects (or proxies when the
+    /// stream needs custom request headers). Unauthenticated by design.
+    /// </summary>
+    [HttpGet("Stream")]
+    [AllowAnonymous]
+    public async Task<ActionResult> PlayAsync([FromQuery] string token, CancellationToken cancellationToken)
     {
-        var config = Plugin.Instance?.Configuration
-            ?? throw new InvalidOperationException("Plugin is not loaded.");
-
-        if (string.IsNullOrWhiteSpace(config.AddonUrl))
+        var plugin = Plugin.Instance;
+        if (plugin is null)
         {
-            var version = Plugin.Instance?.Version?.ToString() ?? typeof(AIOStreamsController).Assembly.GetName().Version?.ToString() ?? "unknown";
-            throw new InvalidOperationException(
-                "The AIOStreams addon URL is not configured (plugin " + version + "). "
-                + "Open the plugin settings, enter the URL, and press Save before using Test connection.");
+            return Unauthorized();
         }
 
-        return (config.AddonUrl.Trim(), string.IsNullOrWhiteSpace(config.ExtraQuery) ? null : config.ExtraQuery.Trim());
+        var secret = plugin.Configuration.PlaybackSecret;
+        if (string.IsNullOrEmpty(secret))
+        {
+            _logger.LogWarning("Playback request with no playback secret configured.");
+            return Unauthorized();
+        }
+
+        var tokenService = new PlaybackTokenService(secret);
+        if (!tokenService.TryVerify(token, out var payload) || payload is null)
+        {
+            _logger.LogWarning("Playback request rejected: invalid token.");
+            return Unauthorized();
+        }
+
+        var config = plugin.Configuration;
+        var response = await _client.GetStreamsAsync(config.AddonUrl, config.ExtraQuery, payload.Type, payload.Id, cancellationToken).ConfigureAwait(false);
+        var streams = (response?.Streams ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s.Url))
+            .GroupBy(s => s.Url, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        var selected = StreamResolver.Select(streams, payload.Quality);
+        if (selected is null)
+        {
+            _logger.LogWarning("No playable stream found for {Type}/{Id}", payload.Type, payload.Id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "No playable stream was found.");
+        }
+
+        if (selected.BehaviorHints?.NotWebReady == true)
+        {
+            return await ProxyAsync(selected.Url!, cancellationToken).ConfigureAwait(false);
+        }
+
+        return Redirect(selected.Url!);
+    }
+
+    /// <summary>
+    /// Serves the optional web-UI hook script (Custom JavaScript integration).
+    /// </summary>
+    [HttpGet("WebUI/hook.js")]
+    [AllowAnonymous]
+    public ActionResult GetHookJs()
+    {
+        var assembly = typeof(AIOStreamsController).Assembly;
+        var resource = $"{assembly.GetName().Name}.Web.hook.js";
+        using var stream = assembly.GetManifestResourceStream(resource);
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "text/javascript", enableRangeProcessing: false);
+    }
+
+    private async Task<ActionResult> ProxyAsync(string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var origin = new Uri(url).GetLeftPart(UriPartial.Authority);
+            request.Headers.Referrer = new Uri(origin);
+            using var response = await _client.SendPlaybackAsync(request, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Playback proxy failed: {Url} -> {Status}", url, (int)response.StatusCode);
+                return StatusCode(StatusCodes.Status502BadGateway, "The stream source failed to respond.");
+            }
+
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+            var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return File(body, contentType, enableRangeProcessing: true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
+        {
+            _logger.LogWarning(ex, "Playback proxy failed for {Url}", url);
+            return StatusCode(StatusCodes.Status502BadGateway, "The stream source failed to respond.");
+        }
+    }
+
+    private string BuildPlaybackBaseUrl()
+    {
+        var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
+        var host = Request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? Request.Host.Value;
+        return $"{scheme}://{host}";
     }
 }

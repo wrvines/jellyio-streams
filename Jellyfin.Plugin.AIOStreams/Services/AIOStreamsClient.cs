@@ -109,6 +109,12 @@ public sealed class AIOStreamsClient
         return await GetJsonAsync<StreamsResponse>(url, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Issues a raw GET for playback proxying (headers supplied by the caller).
+    /// </summary>
+    public async Task<HttpResponseMessage> SendPlaybackAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        => await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
     private async Task<T?> GetJsonAsync<T>(string url, CancellationToken cancellationToken)
         where T : class
     {
