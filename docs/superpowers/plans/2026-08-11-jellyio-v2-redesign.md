@@ -1427,13 +1427,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 - [ ] **Step 3: Build to verify compilation**
 
 Run: `export PATH="$PATH:/home/will/.dotnet" && dotnet build Jellyfin.Plugin.AIOStreams/Jellyfin.Plugin.AIOStreams.csproj -c Release`
-Expected: BUILD SUCCEEDED. (The old `SyncResult`/`CatalogSynchronizer` references in the controller will now fail — Task 8 rewrites the controller; if the build fails only on controller references, that is expected and acceptable; verify the two rewritten files compile by checking error list only mentions the controller/registrator.)
+Expected: BUILD SUCCEEDED is NOT required yet — remaining errors are confined to the old `AIOStreamsController.cs` (SyncResult/CatalogSynchronizer references, fixed in Task 8) and the registrator/RefreshTask (fixed in Task 12). No errors in the new files.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Jellyfin.Plugin.AIOStreams/Configuration/PluginConfiguration.cs Jellyfin.Plugin.AIOStreams/Plugin.cs
-git commit -m "feat: v2 configuration and required /data/stream root"
+git add Jellyfin.Plugin.AIOStreams/Services/OnDemandService.cs Jellyfin.Plugin.AIOStreams/Services/ApiStream.cs
+git commit -m "feat: on-demand add/remove/search orchestration service"
 ```
 
 ---
@@ -1620,8 +1620,9 @@ public sealed class OnDemandService
             throw new ArgumentException("A title id is required.");
         }
 
-        var root = Plugin.Instance?.StreamRoot
+        var plugin = Plugin.Instance
             ?? throw new InvalidOperationException("Plugin is not loaded.");
+        var root = Plugin.StreamRoot;
 
         var type = request.Type.Equals("series", StringComparison.OrdinalIgnoreCase) ? "series" : "movie";
         var quality = string.IsNullOrWhiteSpace(request.Quality) ? config.DefaultQuality : request.Quality.Trim();
@@ -1664,8 +1665,9 @@ public sealed class OnDemandService
         await _addLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var root = Plugin.Instance?.StreamRoot
+            var plugin = Plugin.Instance
                 ?? throw new InvalidOperationException("Plugin is not loaded.");
+            var root = Plugin.StreamRoot;
             var removed = OnDemandLibrary.RemoveTitle(root, type, title, year);
             if (removed)
             {
@@ -1776,13 +1778,13 @@ public sealed class OnDemandService
 - [ ] **Step 3: Build to verify compilation**
 
 Run: `export PATH="$PATH:/home/will/.dotnet" && dotnet build Jellyfin.Plugin.AIOStreams/Jellyfin.Plugin.AIOStreams.csproj -c Release`
-Expected: BUILD SUCCEEDED. (The old `SyncResult`/`CatalogSynchronizer` references in the controller will now fail — Task 8 rewrites the controller; if the build fails only on controller references, that is expected and acceptable; verify the two rewritten files compile by checking error list only mentions the controller/registrator.)
+Expected: BUILD SUCCEEDED is NOT required yet — remaining errors are confined to the old `AIOStreamsController.cs` (SyncResult/CatalogSynchronizer references, fixed in Task 8) and the registrator/RefreshTask (fixed in Task 12). No errors in the new files.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Jellyfin.Plugin.AIOStreams/Configuration/PluginConfiguration.cs Jellyfin.Plugin.AIOStreams/Plugin.cs
-git commit -m "feat: v2 configuration and required /data/stream root"
+git add Jellyfin.Plugin.AIOStreams/Services/OnDemandService.cs Jellyfin.Plugin.AIOStreams/Services/ApiStream.cs
+git commit -m "feat: on-demand add/remove/search orchestration service"
 ```
 
 ---
