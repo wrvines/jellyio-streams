@@ -6,6 +6,12 @@
         body { background: transparent; }
         .jellyio-section { margin: 1.6em 0 0.5em; font-weight: 700; font-size: 1.1em; }
         .jellyio-serverline { color: #999; font-size: 0.92em; margin-top: 0.3em; }
+        .jellyio-banner { margin: 1em 0; padding: 0.7em 1em; border-radius: 6px; border: 1px solid #555; background: #151515; color: #ddd; }
+        .jellyio-banner.warn { border-color: #8a6d3b; background: #2a2415; color: #f0d9a8; }
+        .jellyio-banner.error { border-color: #a94442; background: #2a1515; color: #f0b0b0; }
+        .jellyio-banner p { margin: 0 0 0.4em; }
+        .jellyio-banner p:last-child { margin-bottom: 0; }
+        .jellyio-banner button { margin-top: 0.6em; padding: 0.4em 1.1em; cursor: pointer; }
         .jellyio-field { margin: 0.8em 0; }
         .jellyio-field label { display: block; margin-bottom: 0.25em; font-weight: 600; }
         .jellyio-field input[type="text"],
@@ -28,8 +34,18 @@
         .jellyio-msg { color: #bbb; font-size: 0.92em; margin-top: 0.6em; white-space: pre-wrap; }
         .jellyio-error { color: #e08c8c; font-size: 0.92em; margin-top: 0.6em; white-space: pre-wrap; }
         .jellyio-librarylist { margin-top: 0.6em; }
-        .jellyio-librarylist div { padding: 0.25em 0; border-bottom: 1px solid #222; }
-        .jellyio-librarylist span { color: #999; }
+        .jellyio-libraryrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.25em 0; border-bottom: 1px solid #222; }
+        .jellyio-libraryrow strong { font-weight: 600; }
+        .jellyio-libraryrow span { color: #999; font-size: 0.9em; }
+        .jellyio-libraryrow button { margin: 0 0 0 auto; padding: 0.25em 0.9em; cursor: pointer; }
+        .jellyio-picker { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .jellyio-pickerBox { width: min(30em, 90vw); max-height: 75vh; overflow: auto; background: #151515; border: 1px solid #555; border-radius: 6px; padding: 1em; }
+        .jellyio-pickerBox h2 { margin: 0 0 0.6em; font-size: 1.05em; }
+        .jellyio-pickerRow { display: flex; align-items: center; gap: 0.6em; padding: 0.35em 0; border-bottom: 1px solid #222; }
+        .jellyio-pickerRow span { flex: 1; color: #bbb; font-size: 0.92em; }
+        .jellyio-pickerRow button { padding: 0.3em 1em; cursor: pointer; }
+        .jellyio-pickerClose { margin-top: 0.8em; text-align: right; }
+        .jellyio-pickerClose button { padding: 0.3em 1em; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -38,23 +54,27 @@
             <h1 style="margin:0;">Jellyio Streams</h1>
             <div class="jellyio-serverline" id="serverLine"></div>
 
-            <div class="jellyio-section">Find a title</div>
-            <div class="jellyio-searchrow">
-                <div class="jellyio-field">
-                    <label>Type</label>
-                    <select class="fldSearchType">
-                        <option value="movie">Movie</option>
-                        <option value="series">Series</option>
-                    </select>
+            <div id="setupBanner"></div>
+
+            <div class="jellyio-search" id="searchSection" style="display:none;">
+                <div class="jellyio-section">Find a title</div>
+                <div class="jellyio-searchrow">
+                    <div class="jellyio-field">
+                        <label>Type</label>
+                        <select class="fldSearchType">
+                            <option value="movie">Movie</option>
+                            <option value="series">Series</option>
+                        </select>
+                    </div>
+                    <div class="jellyio-field" style="flex:1 1 20em;">
+                        <label>Search AIOStreams</label>
+                        <input type="text" class="fldSearchTerm" placeholder="e.g. Dune" />
+                    </div>
+                    <button type="button" class="btnSearch" style="padding:0.5em 1.1em; cursor:pointer;">Search</button>
                 </div>
-                <div class="jellyio-field" style="flex:1 1 20em;">
-                    <label>Search AIOStreams</label>
-                    <input type="text" class="fldSearchTerm" placeholder="e.g. Dune" />
-                </div>
-                <button type="button" class="btnSearch" style="padding:0.5em 1.1em; cursor:pointer;">Search</button>
+                <div class="jellyio-msg" id="searchMsg"></div>
+                <div class="jellyio-grid" id="searchResults"></div>
             </div>
-            <div class="jellyio-msg" id="searchMsg"></div>
-            <div class="jellyio-grid" id="searchResults"></div>
 
             <div class="jellyio-section">In your library</div>
             <div class="jellyio-actions">
@@ -103,6 +123,9 @@
                 function Controller(page) {
                     this.page = page;
                     this.added = {};
+                    this.ok = false;
+                    this.qualityPicker = false;
+                    this.autoSearch = null;
                 }
 
                 Controller.prototype.el = function (selector) {
@@ -135,27 +158,80 @@
                     this.showError(context + " " + (err && err.message ? err.message : err));
                 };
 
-                Controller.prototype.serverLine = function () {
+                Controller.prototype.status = function () {
                     var self = this;
+                    var banner = this.el("#setupBanner");
+                    var section = this.el("#searchSection");
                     ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Status")).then(function (status) {
-                        var configured = pick(status, "AddonUrlConfigured");
+                        var folderState = pick(status, "FolderState") || "";
+                        var addonConfigured = pick(status, "AddonUrlConfigured") === true;
                         var version = pick(status, "PluginVersion");
-                        var line = "Server: plugin " + (version || "?") + " · addon URL " +
-                            (configured ? "configured" : "NOT configured");
-                        if (!configured) {
-                            line += " — open the plugin settings and enter your AIOStreams URL first.";
-                            self.el("#serverLine").innerHTML = escapeHtml(line) +
-                                ' <a href="configurationpage?name=' + encodeURIComponent("Jellyio Streams") + '">Settings</a>';
-                            return;
-                        }
+                        var addonName = pick(status, "AddonName");
+                        self.ok = folderState === "Ok" && addonConfigured;
+                        self.qualityPicker = pick(status, "QualityPickerAtAdd") === true;
+
+                        var line = "plugin v" + (version || "?") + " · addon: " +
+                            (addonName ? addonName : "(not configured)") + " · folder: " + (folderState || "?");
                         self.setText("#serverLine", line);
+
+                        var problems = [];
+                        if (folderState === "Missing") {
+                            problems.push({ cls: "warn", html: "<p>The required /data/stream folder is missing.</p>" });
+                        } else if (folderState === "NotDirectory" || folderState === "NotWritable") {
+                            problems.push({ cls: "error", html: "<p>The required /data/stream folder is not usable (state: " + escapeHtml(folderState) + ").</p>" });
+                        }
+                        if (!addonConfigured) {
+                            problems.push({ cls: "warn", html: "<p>Open the plugin settings and enter your AIOStreams URL first. " +
+                                '<a href="configurationpage?name=' + encodeURIComponent("Jellyio Streams") + '">Open settings</a></p>' });
+                        }
+
+                        if (problems.length > 0) {
+                            banner.innerHTML = problems.map(function (p) {
+                                return '<div class="jellyio-banner ' + p.cls + '">' + p.html + "</div>";
+                            }).join("");
+                            if (folderState === "Missing") {
+                                var create = document.createElement("button");
+                                create.type = "button";
+                                create.textContent = "Create now";
+                                create.addEventListener("click", function () { self.createFolder(); });
+                                banner.lastChild.appendChild(create);
+                            }
+                            section.style.display = "none";
+                        } else {
+                            banner.innerHTML = "";
+                            section.style.display = "";
+                            self.library();
+                        }
+
+                        if (self.ok && self.autoSearch) {
+                            self.autoSearch = null;
+                            self.search();
+                        }
                     }).catch(function (err) {
                         self.showHttpError("Failed to read status:", err);
                     });
                 };
 
+                Controller.prototype.createFolder = function () {
+                    var self = this;
+                    loading(true);
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/CreateFolder"),
+                        contentType: "application/json",
+                        dataType: "json"
+                    }).then(function () {
+                        loading(false);
+                        self.status();
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Failed to create the stream folder:", err);
+                    });
+                };
+
                 Controller.prototype.search = function () {
                     var self = this;
+                    if (!self.ok) { return; }
                     var term = this.el(".fldSearchTerm").value.trim();
                     var type = this.el(".fldSearchType").value;
                     if (!term) { return; }
@@ -197,7 +273,14 @@
                         }).join("");
 
                         container.querySelectorAll("button[data-id]").forEach(function (btn) {
-                            btn.addEventListener("click", function () { self.add(btn); });
+                            btn.addEventListener("click", function () {
+                                if (self.qualityPicker) {
+                                    self.openPicker(btn);
+                                } else {
+                                    self.add(btn.getAttribute("data-id"), btn.getAttribute("data-type") || "movie",
+                                        btn.getAttribute("data-name"), btn.getAttribute("data-release"), null, btn);
+                                }
+                            });
                         });
                     }).catch(function (err) {
                         loading(false);
@@ -205,79 +288,223 @@
                     });
                 };
 
-                Controller.prototype.add = function (btn) {
+                Controller.prototype.openPicker = function (btn) {
                     var self = this;
                     var id = btn.getAttribute("data-id");
-                    btn.disabled = true;
-                    btn.textContent = "Adding…";
+                    var type = btn.getAttribute("data-type") || "movie";
+                    var name = btn.getAttribute("data-name");
+                    var release = btn.getAttribute("data-release");
+                    loading(true);
+
+                    ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Streams", { type: type, id: id })).then(function (streams) {
+                        loading(false);
+                        var list = streams || [];
+
+                        var overlay = document.createElement("div");
+                        overlay.className = "jellyio-picker";
+                        overlay.setAttribute("role", "dialog");
+                        overlay.setAttribute("aria-label", "Choose a stream for " + (name || id));
+
+                        var box = document.createElement("div");
+                        box.className = "jellyio-pickerBox";
+
+                        var title = document.createElement("h2");
+                        title.textContent = "Choose a stream";
+                        box.appendChild(title);
+
+                        function addRow(label, quality) {
+                            var row = document.createElement("div");
+                            row.className = "jellyio-pickerRow";
+                            var span = document.createElement("span");
+                            span.textContent = label;
+                            row.appendChild(span);
+                            var rowBtn = document.createElement("button");
+                            rowBtn.type = "button";
+                            rowBtn.textContent = "Add";
+                            rowBtn.addEventListener("click", function () {
+                                close();
+                                self.add(id, type, name, release, quality, rowBtn);
+                            });
+                            row.appendChild(rowBtn);
+                            box.appendChild(row);
+                        }
+
+                        if (list.length === 0) {
+                            var hint = document.createElement("div");
+                            hint.className = "jellyio-hint";
+                            hint.textContent = "No streams were found — the addon may have no playable sources for this title.";
+                            box.appendChild(hint);
+                        } else {
+                            list.forEach(function (stream) {
+                                addRow(pick(stream, "Label") || "Stream", pick(stream, "Label") || "");
+                            });
+                        }
+                        addRow("Best (auto)", null);
+
+                        var closeRow = document.createElement("div");
+                        closeRow.className = "jellyio-pickerClose";
+                        var closeBtn = document.createElement("button");
+                        closeBtn.type = "button";
+                        closeBtn.textContent = "Cancel";
+                        closeBtn.addEventListener("click", close);
+                        closeRow.appendChild(closeBtn);
+                        box.appendChild(closeRow);
+
+                        function close() {
+                            document.removeEventListener("keydown", onKey);
+                            if (overlay.parentNode) { overlay.parentNode.removeChild(overlay); }
+                        }
+
+                        function onKey(e) {
+                            if (e.key === "Escape") { close(); }
+                        }
+
+                        overlay.addEventListener("click", function (e) {
+                            if (e.target === overlay) { close(); }
+                        });
+                        document.addEventListener("keydown", onKey);
+
+                        overlay.appendChild(box);
+                        document.body.appendChild(overlay);
+                        closeBtn.focus();
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Failed to load streams:", err);
+                    });
+                };
+
+                Controller.prototype.add = function (id, type, name, release, quality, btn) {
+                    var self = this;
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.textContent = "Adding…";
+                    }
                     loading(true);
 
                     ApiClient.ajax({
                         type: "POST",
                         url: ApiClient.getUrl("AIOStreams/Add"),
                         data: JSON.stringify({
-                            type: btn.getAttribute("data-type") || "movie",
+                            type: type || "movie",
                             id: id,
-                            name: btn.getAttribute("data-name"),
-                            releaseInfo: btn.getAttribute("data-release")
+                            name: name,
+                            releaseInfo: release,
+                            quality: quality || null
                         }),
                         contentType: "application/json",
                         dataType: "json"
-                    }).then(function (result) {
+                    }).then(function () {
                         loading(false);
                         self.added[id] = true;
-                        btn.disabled = false;
-                        btn.textContent = "Added";
-                        btn.setAttribute("disabled", "disabled");
-                        var text = [
-                            pick(result, "Movies") + " movies",
-                            pick(result, "Shows") + " shows",
-                            pick(result, "Episodes") + " episodes",
-                            pick(result, "Streams") + " streams",
-                            pick(result, "Files") + " files"
-                        ].join(", ") + " added to your library. Jellyfin is scanning it now.";
-                        self.setText("#searchMsg", "Added: " + text);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = "Added";
+                            btn.setAttribute("disabled", "disabled");
+                        }
+                        self.setText("#searchMsg", "Added — Jellyfin is scanning now.");
                         self.library();
+                        self.status();
                     }).catch(function (err) {
                         loading(false);
-                        btn.disabled = false;
-                        btn.textContent = "Add";
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = "Add";
+                        }
                         self.showHttpError("Add failed:", err);
+                    });
+                };
+
+                Controller.prototype.remove = function (btn) {
+                    var self = this;
+                    var title = btn.getAttribute("data-title");
+                    if (!title) { return; }
+                    if (!window.confirm("Remove \"" + title + "\" from your library?")) { return; }
+
+                    loading(true);
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AIOStreams/Remove"),
+                        data: JSON.stringify({
+                            type: btn.getAttribute("data-type") || "movie",
+                            title: title,
+                            year: btn.getAttribute("data-year") || null
+                        }),
+                        contentType: "application/json",
+                        dataType: "json"
+                    }).then(function () {
+                        loading(false);
+                        self.library();
+                        self.status();
+                    }).catch(function (err) {
+                        loading(false);
+                        self.showHttpError("Remove failed:", err);
                     });
                 };
 
                 Controller.prototype.library = function () {
                     var self = this;
                     ApiClient.getJSON(ApiClient.getUrl("AIOStreams/Library")).then(function (data) {
-                        var movies = pick(data, "Movies") || [];
-                        var shows = pick(data, "Shows") || [];
+                        var titles = pick(data, "Titles") || [];
                         var root = pick(data, "RootPath") || "";
                         var box = self.el("#libraryBox");
 
-                        if (movies.length === 0 && shows.length === 0) {
+                        if (titles.length === 0) {
                             box.innerHTML = '<div class="jellyio-hint">Nothing in the library yet — search above and press Add.</div>';
                             return;
                         }
 
                         var html = '<div class="jellyio-librarylist">';
-                        if (movies.length > 0) {
-                            html += "<div><strong>Movies</strong></div>";
-                            movies.forEach(function (m) {
-                                html += "<div>" + escapeHtml(pick(m, "Name")) + ' <span>' + escapeHtml(pick(m, "Year") || "") + "</span></div>";
-                            });
-                        }
-                        if (shows.length > 0) {
-                            html += "<div><strong>Shows</strong></div>";
-                            shows.forEach(function (s) {
-                                html += "<div>" + escapeHtml(pick(s, "Name")) + ' <span>' + escapeHtml(pick(s, "Year") || "") + "</span></div>";
-                            });
-                        }
+                        titles.forEach(function (t) {
+                            var name = pick(t, "Name") || "";
+                            var year = pick(t, "Year") || "";
+                            var type = pick(t, "Type") || "movie";
+                            html += '<div class="jellyio-libraryrow">' +
+                                "<strong>" + escapeHtml(name) + "</strong>" +
+                                (year ? "<span>" + escapeHtml(year) + "</span>" : "") +
+                                "<span>" + escapeHtml(type) + "</span>" +
+                                '<button type="button" data-title="' + escapeHtml(name) +
+                                    '" data-year="' + escapeHtml(year) +
+                                    '" data-type="' + escapeHtml(type) + '">Remove</button>' +
+                                "</div>";
+                        });
                         html += "</div>";
                         if (root) { html += '<div class="jellyio-hint">Library folder: ' + escapeHtml(root) + "</div>"; }
                         box.innerHTML = html;
+
+                        box.querySelectorAll("button[data-title]").forEach(function (btn) {
+                            btn.addEventListener("click", function () { self.remove(btn); });
+                        });
                     }).catch(function (err) {
                         self.showHttpError("Failed to read the library:", err);
                     });
+                };
+
+                Controller.prototype.prefillFromUrl = function () {
+                    var params = {};
+                    var sources = [window.location.hash, window.location.search];
+                    for (var i = 0; i < sources.length; i++) {
+                        var source = sources[i];
+                        var q = source.indexOf("?");
+                        if (q < 0) { continue; }
+                        var parts = source.slice(q + 1).split("&");
+                        for (var j = 0; j < parts.length; j++) {
+                            var pair = parts[j].split("=");
+                            if (!pair[0]) { continue; }
+                            var key = decodeURIComponent(pair[0].replace(/\+/g, " "));
+                            var value = pair.length > 1 ? decodeURIComponent(pair.slice(1).join("=").replace(/\+/g, " ")) : "";
+                            if (key) { params[key] = value; }
+                        }
+                    }
+
+                    var query = params.query;
+                    var type = params.type;
+                    if (type === "movie" || type === "series") {
+                        this.el(".fldSearchType").value = type;
+                    }
+                    if (query) {
+                        this.el(".fldSearchTerm").value = query;
+                        this.autoSearch = query;
+                    }
                 };
 
                 Controller.prototype.bind = function () {
@@ -295,8 +522,8 @@
 
                     var controller = new Controller(page);
                     controller.bind();
-                    controller.serverLine();
-                    controller.library();
+                    controller.prefillFromUrl();
+                    controller.status();
                 }
 
                 init(currentPage());
