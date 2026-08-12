@@ -3,7 +3,7 @@ guid: "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b"
 version: "2.0.0.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
-owner: "aiostreams-plugin"
+owner: "wrvines"
 overview: "Stream Stremio-addon content from a self-hosted AIOStreams instance."
 description: >
   On-demand: search AIOStreams from Jellyfin, add titles to the required /data/stream folder

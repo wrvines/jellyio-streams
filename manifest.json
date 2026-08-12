@@ -12,7 +12,7 @@
         "changelog": "v2: on-demand search & add; signed playback redirect (fresh streams, works on all clients); required /data/stream folder (TRaSH layout); optional in-library search via Custom JS hook.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/wrvines/jellyio-streams/releases/download/v2.0.0.0/jellyio-streams_2.0.0.0.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "1CE2BD72E13BAC0F437C04A65CB96D958AECDEEEF1A5A02D3FB190DBEAE93006",
         "timestamp": "2026-08-12T00:00:00Z"
       },
       {
