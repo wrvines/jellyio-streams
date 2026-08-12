@@ -250,11 +250,12 @@ public sealed class PlaybackTokenService
 
     /// <summary>
     /// Initializes a new instance with a base64url-encoded secret (see <see cref="GenerateSecret"/>).
+    /// Tokens are effectively permanent (10-year default) — the per-install secret bounds exposure.
     /// </summary>
     public PlaybackTokenService(string secret, TimeSpan? lifetime = null)
     {
         _key = Base64UrlDecode(secret);
-        _lifetime = lifetime ?? TimeSpan.FromDays(7);
+        _lifetime = lifetime ?? TimeSpan.FromDays(3650);
     }
 
     /// <summary>

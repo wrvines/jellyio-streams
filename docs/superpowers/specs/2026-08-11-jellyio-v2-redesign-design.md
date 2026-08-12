@@ -77,15 +77,17 @@ client presses Play
   server-side probing; HMAC replaces auth).
 - Token: HMAC-SHA256 over `type|id|quality?|expiry`, keyed by a per-install
   secret stored in configuration (`PlaybackSecret`, auto-generated, never shown).
-  Expiry: 7 days (cosmetic — auto-resolve refreshes at play time).
+  Expiry: effectively permanent (10-year default lifetime; auto-resolve refreshes the
+  stream at play time, the token never expires in practice). Decision 2026-08-12: the
+  7-day expiry was a silent time bomb — nothing refreshes the baked token.
 - Selection logic:
   - Auto mode: rank streams by quality (resolution, HDR, codec, size heuristics,
     Stremio-style) and pick best.
   - Quality mode: token carries the quality preference written at add time;
     pick the best stream matching that preference.
-  - Fallback: if the preferred stream fails (dead URL), fall through the ranked
-    list to the next best.
-  - All dead → 503 with client-visible message; resolution timeout → 504.
+  - Fallback: proxied (NotWebReady) streams retry the ranked list server-side until
+    one upstream succeeds; all dead → 502. Direct (302) streams leave dead-link
+    handling to the client (the server cannot detect a dead redirect).
   - Streams requiring custom request headers → server-side proxy with headers
     injected, instead of redirect.
 - `.strm` content written: `http://<jellyfin-host>/AIOStreams/Stream?token=<…>`
@@ -145,8 +147,8 @@ settings (`EnabledCatalogIds`, `MaxItemsPerCatalog`, `MaxStreamsPerTitle`,
 - Setup gating: search/add/stream endpoints return 400 "setup required: <reason>"
   when addon URL or `/data/stream` is invalid. Status reports each failure
   distinctly (missing folder / not writable / missing URL).
-- Playback: dead-stream fallback chain; all-dead → 503; timeout → 504.
-  Logs redact the addon URL (tokenized).
+- Playback: proxied-stream fallback chain (all-dead → 502); timeout → 504.
+  Logs redact the addon URL (implemented: path/query masked).
 - Concurrency: per-title add lock; concurrent adds fine; no global wipe ever.
 - Invalid/tampered/expired token → 403, logged, no resolution attempted.
 
