@@ -254,7 +254,7 @@ public sealed class PlaybackTokenService
     /// </summary>
     public PlaybackTokenService(string secret, TimeSpan? lifetime = null)
     {
-        _key = Convert.FromBase64String(secret);
+        _key = Base64UrlDecode(secret);
         _lifetime = lifetime ?? TimeSpan.FromDays(7);
     }
 
