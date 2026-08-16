@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.AIOStreams</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.AIOStreams</AssemblyName>
-    <Version>2.0.0.1</Version>
+    <Version>2.0.0.2</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDynamicLoading>true</EnableDynamicLoading>

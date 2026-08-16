@@ -8,6 +8,14 @@
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
       {
+        "version": "2.0.0.2",
+        "changelog": "v2.0.0.2: expose the AIOStreams URL on the Jellyfin 10.11-selected Settings/search page, preserve existing plugin settings when saving, and keep sidebar search available.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://cdn.jsdelivr.net/gh/wrvines/jellyio-streams@main/jellyio-streams_2.0.0.2.zip",
+        "checksum": "5FB110297000BE34D3CF83A8BA99A51A",
+        "timestamp": "2026-08-16T04:21:23Z"
+      },
+      {
         "version": "2.0.0.1",
         "changelog": "v2.0.0.1: serve the plugin zip from jsDelivr (CDN) instead of GitHub release assets to bypass content filters that mangle release downloads.",
         "targetAbi": "10.11.0.0",

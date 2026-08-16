@@ -12,6 +12,8 @@
         .jellyio-banner p { margin: 0 0 0.4em; }
         .jellyio-banner p:last-child { margin-bottom: 0; }
         .jellyio-banner button { margin-top: 0.6em; padding: 0.4em 1.1em; cursor: pointer; }
+        .jellyio-connection { margin: 1em 0; padding: 0.8em 1em; border: 1px solid #333; border-radius: 6px; background: #101010; }
+        .jellyio-connection .jellyio-section { margin-top: 0; }
         .jellyio-field { margin: 0.8em 0; }
         .jellyio-field label { display: block; margin-bottom: 0.25em; font-weight: 600; }
         .jellyio-field input[type="text"],
@@ -53,6 +55,19 @@
         <div class="content-primary" style="max-width:70em; padding:1em;">
             <h1 style="margin:0;">Jellyio Streams</h1>
             <div class="jellyio-serverline" id="serverLine"></div>
+
+            <div class="jellyio-connection" id="connectionPanel">
+                <div class="jellyio-section">AIOStreams connection</div>
+                <div class="jellyio-field">
+                    <label for="AddonUrl">AIOStreams addon URL</label>
+                    <input type="text" id="AddonUrl" class="fldAddonUrl" placeholder="https://stream.example.com/stremio/&lt;uuid&gt;/&lt;token&gt;" />
+                    <div class="jellyio-hint">Paste the per-user URL from AIOStreams "Save &amp; Install".</div>
+                </div>
+                <div class="jellyio-actions">
+                    <button type="button" class="btnSaveAddonUrl" style="padding:0.5em 1.1em; cursor:pointer;">Save URL</button>
+                    <span class="connectionSaveResult jellyio-result"></span>
+                </div>
+            </div>
 
             <div id="setupBanner"></div>
 
@@ -126,6 +141,7 @@
                     this.ok = false;
                     this.qualityPicker = false;
                     this.autoSearch = null;
+                    this.loadedConfig = null;
                 }
 
                 Controller.prototype.el = function (selector) {
@@ -142,20 +158,74 @@
                     try { console.error("[Jellyio Streams] " + message); } catch (e) { /* ignore */ }
                 };
 
-                Controller.prototype.showHttpError = function (context, err) {
+                Controller.prototype.showHttpError = function (context, err, targetSelector) {
                     var self = this;
+                    var target = targetSelector || "#searchMsg";
+                    var display = function (message) { self.showError(message, target); };
                     if (err && typeof err.status === "number") {
                         var base = context + " HTTP " + err.status + (err.url ? " (" + err.url + ")" : "");
                         if (typeof err.text === "function") {
                             err.text().then(function (body) {
-                                self.showError(base + (body ? " - " + body.slice(0, 400) : ""));
-                            }).catch(function () { self.showError(base); });
+                                display(base + (body ? " - " + body.slice(0, 400) : ""));
+                            }).catch(function () { display(base); });
                         } else {
-                            self.showError(base);
+                            display(base);
                         }
                         return;
                     }
-                    this.showError(context + " " + (err && err.message ? err.message : err));
+                    display(context + " " + (err && err.message ? err.message : err));
+                };
+
+                Controller.prototype.loadConfig = function () {
+                    var self = this;
+                    if (!window.ApiClient) {
+                        this.setText(".connectionSaveResult", "ApiClient is not available in this page.");
+                        return Promise.reject(new Error("ApiClient is not available in this page."));
+                    }
+
+                    return ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
+                        self.loadedConfig = config;
+                        self.el(".fldAddonUrl").value = pick(config, "AddonUrl") || "";
+                    }).catch(function (err) {
+                        self.setText(".connectionSaveResult", "Could not load plugin settings.");
+                        self.showHttpError("Failed to load plugin settings:", err, ".connectionSaveResult");
+                    });
+                };
+
+                Controller.prototype.saveAddonUrl = function () {
+                    var self = this;
+                    var input = this.el(".fldAddonUrl");
+                    var button = this.el(".btnSaveAddonUrl");
+                    var addonUrl = input.value.trim();
+
+                    if (!addonUrl) {
+                        this.setText(".connectionSaveResult", "Enter an AIOStreams install URL first.");
+                        input.focus();
+                        return Promise.resolve();
+                    }
+
+                    button.disabled = true;
+                    this.setText(".connectionSaveResult", "Saving…");
+
+                    return ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (current) {
+                        var config = {
+                            AddonUrl: addonUrl,
+                            ExtraQuery: pick(current, "ExtraQuery") || "",
+                            AutoCreateStreamFolder: pick(current, "AutoCreateStreamFolder") !== false,
+                            QualityPickerAtAdd: pick(current, "QualityPickerAtAdd") === true,
+                            DefaultQuality: pick(current, "DefaultQuality") || "auto",
+                            MaxStreamsShown: pick(current, "MaxStreamsShown") == null ? 10 : pick(current, "MaxStreamsShown"),
+                            PlaybackSecret: pick(current, "PlaybackSecret") || ""
+                        };
+                        return ApiClient.updatePluginConfiguration(PLUGIN_ID, config);
+                    }).then(function () {
+                        self.setText(".connectionSaveResult", "Saved.");
+                        return self.loadConfig().then(function () { self.status(); });
+                    }).catch(function (err) {
+                        self.showHttpError("Save failed:", err, ".connectionSaveResult");
+                    }).finally(function () {
+                        button.disabled = false;
+                    });
                 };
 
                 Controller.prototype.status = function () {
@@ -208,7 +278,7 @@
                             self.search();
                         }
                     }).catch(function (err) {
-                        self.showHttpError("Failed to read status:", err);
+                        self.showHttpError("Failed to read status:", err, "#setupBanner");
                     });
                 };
 
@@ -509,6 +579,7 @@
 
                 Controller.prototype.bind = function () {
                     var self = this;
+                    this.el(".btnSaveAddonUrl").addEventListener("click", function () { self.saveAddonUrl(); });
                     this.el(".btnSearch").addEventListener("click", function () { self.search(); });
                     this.el(".btnRefresh").addEventListener("click", function () { self.library(); });
                     this.el(".fldSearchTerm").addEventListener("keypress", function (e) {
@@ -523,6 +594,7 @@
                     var controller = new Controller(page);
                     controller.bind();
                     controller.prefillFromUrl();
+                    controller.loadConfig();
                     controller.status();
                 }
 
