@@ -12,7 +12,7 @@
         "changelog": "v2.0.0.1: serve the plugin zip from jsDelivr (CDN) instead of GitHub release assets to bypass content filters that mangle release downloads.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://cdn.jsdelivr.net/gh/wrvines/jellyio-streams@main/jellyio-streams_2.0.0.1.zip",
-        "checksum": "8BF4DC8F46185F102442D35646723B048A4AF2FCC6F6BD94D2FEEC8D6E22001E",
+        "checksum": "AAEF6C6A1F648C2B8E02E6FC07F7835F",
         "timestamp": "2026-08-12T12:00:00Z"
       },
       {
