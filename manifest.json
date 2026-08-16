@@ -12,7 +12,7 @@
         "changelog": "v2.0.0.2: expose the AIOStreams URL on the Jellyfin 10.11-selected Settings/search page, preserve existing plugin settings when saving, and keep sidebar search available.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://cdn.jsdelivr.net/gh/wrvines/jellyio-streams@main/jellyio-streams_2.0.0.2.zip",
-        "checksum": "5FB110297000BE34D3CF83A8BA99A51A",
+        "checksum": "8AAAD7EA2C947DEDA4EB400EFD6D59C1",
         "timestamp": "2026-08-16T04:21:23Z"
       },
       {
