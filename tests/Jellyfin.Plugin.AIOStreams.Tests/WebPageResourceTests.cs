@@ -20,5 +20,9 @@ public sealed class WebPageResourceTests
         Assert.Contains("btnSaveAddonUrl", html);
         Assert.Contains("updatePluginConfiguration", html);
         Assert.Contains("PlaybackSecret", html);
+        Assert.Contains("showError = function (message, targetSelector)", html);
+        Assert.Contains("targetSelector || \"#searchMsg\"", html);
+        Assert.Contains("err.status === 204", html);
+        Assert.Contains("showHttpError(\"Failed to create the stream folder:\", err, \"#setupBanner\")", html);
     }
 }

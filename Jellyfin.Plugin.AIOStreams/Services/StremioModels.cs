@@ -43,6 +43,12 @@ public sealed class ManifestCatalog
     public bool? Featured { get; set; }
 
     public ManifestCatalogExtra[]? Extra { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether this catalog accepts Stremio search extras.
+    /// </summary>
+    public bool SupportsSearch => Extra?.Any(e => string.Equals(e.Name, "search", StringComparison.OrdinalIgnoreCase)) == true
+        || Id?.Contains("search", StringComparison.OrdinalIgnoreCase) == true;
 }
 
 public sealed class ManifestCatalogExtra

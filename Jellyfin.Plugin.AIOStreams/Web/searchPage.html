@@ -153,8 +153,8 @@
                     if (el) { el.textContent = text; }
                 };
 
-                Controller.prototype.showError = function (message) {
-                    this.setText("#searchMsg", "ERROR: " + message);
+                Controller.prototype.showError = function (message, targetSelector) {
+                    this.setText(targetSelector || "#searchMsg", "ERROR: " + message);
                     try { console.error("[Jellyio Streams] " + message); } catch (e) { /* ignore */ }
                 };
 
@@ -217,7 +217,10 @@
                             MaxStreamsShown: pick(current, "MaxStreamsShown") == null ? 10 : pick(current, "MaxStreamsShown"),
                             PlaybackSecret: pick(current, "PlaybackSecret") || ""
                         };
-                        return ApiClient.updatePluginConfiguration(PLUGIN_ID, config);
+                        return ApiClient.updatePluginConfiguration(PLUGIN_ID, config).catch(function (err) {
+                            if (err && err.status === 204) { return; }
+                            throw err;
+                        });
                     }).then(function () {
                         self.setText(".connectionSaveResult", "Saved.");
                         return self.loadConfig().then(function () { self.status(); });
@@ -295,7 +298,7 @@
                         self.status();
                     }).catch(function (err) {
                         loading(false);
-                        self.showHttpError("Failed to create the stream folder:", err);
+                        self.showHttpError("Failed to create the stream folder:", err, "#setupBanner");
                     });
                 };
 

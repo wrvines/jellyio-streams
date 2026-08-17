@@ -85,6 +85,29 @@ public static partial class StreamFolder
     }
 
     /// <summary>
+    /// Validates the root and optionally creates it, returning a usable state instead of throwing
+    /// when the container cannot create the configured path.
+    /// </summary>
+    public static FolderState EnsureUsable(string root, bool createIfMissing)
+    {
+        var state = Validate(root);
+        if (state != FolderState.Missing || !createIfMissing)
+        {
+            return state;
+        }
+
+        try
+        {
+            Create(root);
+            return Validate(root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return FolderState.NotWritable;
+        }
+    }
+
+    /// <summary>
     /// Builds a folder name like "Dune (2021)" from a title and year.
     /// </summary>
     public static string BuildFolderName(string title, string? year)

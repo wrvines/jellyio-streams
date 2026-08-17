@@ -56,14 +56,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// </summary>
     public string EnsureStreamFolder()
     {
-        var state = StreamFolder.Validate(StreamRoot);
-        if (state == FolderState.Missing && Configuration.AutoCreateStreamFolder)
-        {
-            StreamFolder.Create(StreamRoot);
-            state = StreamFolder.Validate(StreamRoot);
-        }
-
-        return state.ToString();
+        return StreamFolder.EnsureUsable(StreamRoot, Configuration.AutoCreateStreamFolder).ToString();
     }
 
     public IEnumerable<PluginPageInfo> GetPages()

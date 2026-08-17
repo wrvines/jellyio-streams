@@ -45,6 +45,17 @@ public class StreamFolderTests : IDisposable
         Assert.Equal(FolderState.Ok, StreamFolder.Validate(_root));
     }
 
+    [Fact]
+    public void EnsureUsable_UncreatablePath_ReturnsNotWritable()
+    {
+        File.WriteAllText(_root, "x");
+        var child = Path.Combine(_root, "stream");
+        var method = typeof(StreamFolder).GetMethod("EnsureUsable");
+
+        Assert.NotNull(method);
+        Assert.Equal(FolderState.NotWritable, method.Invoke(null, [child, true]));
+    }
+
     [Theory]
     [InlineData("Dune", null, "Dune")]
     [InlineData("Dune", "2021", "Dune (2021)")]

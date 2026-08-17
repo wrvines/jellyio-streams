@@ -57,7 +57,7 @@ public sealed class OnDemandService
 
         var searchCatalog = (manifest.Catalogs ?? [])
             .FirstOrDefault(c => string.Equals(c.Type, type, StringComparison.OrdinalIgnoreCase)
-                && c.Id?.Contains("search", StringComparison.OrdinalIgnoreCase) == true);
+                && c.SupportsSearch);
 
         if (searchCatalog is null)
         {
