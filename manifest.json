@@ -8,6 +8,14 @@
     "guid": "3a9f7c1e-5b6d-4e8f-9c2a-1d4b5e6f7a8b",
     "versions": [
       {
+        "version": "2.0.0.3",
+        "changelog": "v2.0.0.3: fix AIOStreams search catalog detection, visible setup/save errors, Jellyfin 204 configuration saves, and /data/stream permission diagnostics.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://cdn.jsdelivr.net/gh/wrvines/jellyio-streams@main/jellyio-streams_2.0.0.3.zip",
+        "checksum": "50B5674C03D487999A1372F2E4F9A97E",
+        "timestamp": "2026-08-17T00:04:48Z"
+      },
+      {
         "version": "2.0.0.2",
         "changelog": "v2.0.0.2: expose the AIOStreams URL on the Jellyfin 10.11-selected Settings/search page, preserve existing plugin settings when saving, and keep sidebar search available.",
         "targetAbi": "10.11.0.0",
